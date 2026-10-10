@@ -9,6 +9,7 @@ import { StateMessage } from '../components/ui/StateMessage'
 import { catalogSources, formatDuration, listeningSources } from '../domain/songs'
 import type { TagKind, UserSong } from '../domain/types'
 import { AddToPlaylist } from '../features/library/AddToPlaylist'
+import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
 import { SongArtwork } from '../features/songs/SongArtwork'
 import { SourceLinks } from '../features/songs/SourceLinks'
@@ -97,16 +98,22 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
   return (
     <article className={styles.layout}>
       <div className={styles.primary}>
-        <SongArtwork song={song} variant="hero">
-          <p className={styles.artTitle}>{song.title}</p>
-          <p className={styles.artArtist}>{song.artist_credit}</p>
-          {song.disambiguation ? <p className={styles.artMeta}>{song.disambiguation}</p> : null}
-        </SongArtwork>
+        <div className={styles.cover}>
+          <SongArtwork song={song} variant="hero">
+            <p className={styles.artTitle}>{song.title}</p>
+            <p className={styles.artArtist}>{song.artist_credit}</p>
+            {song.disambiguation ? <p className={styles.artMeta}>{song.disambiguation}</p> : null}
+          </SongArtwork>
+          <div className={styles.coverActions} role="group" aria-label="Save this song">
+            <FavoriteButton song={song} />
+            <AddToPlaylist songId={song.id} songTitle={song.title} />
+          </div>
+        </div>
 
         <section className={styles.tags} aria-labelledby="tags-title">
           <div className={styles.tagsHeader}>
             <h2 id="tags-title" className={styles.sectionTitle}>
-              Tags <span>Artist • Genre • Feeling • Instrument</span>
+              Tags
             </h2>
             {presentKinds.length > 1 ? (
               <TagKindFilter kinds={presentKinds} value={kindFilter} onChange={setKindFilter} />
@@ -137,10 +144,6 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
             {duration ? <span> · {duration}</span> : null}
           </p>
         </header>
-
-        <div className={styles.actions}>
-          <AddToPlaylist songId={song.id} />
-        </div>
 
         <SourceLinks label="Listen on:" sources={listenOn} />
 

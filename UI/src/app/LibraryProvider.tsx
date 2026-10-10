@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { containsSong, firstMembership, movedMembershipIds, type Playlist } from '../domain/library'
+import {
+  applyOrder,
+  containsSong,
+  firstMembership,
+  movedMembershipIds,
+  type Playlist,
+} from '../domain/library'
 import { LibraryUnavailableError, type LibraryService } from '../services/library'
 import { LibraryContext, type LibraryActions, type LibraryStatus } from './contexts'
+import { useFavoritesState } from './useFavoritesState'
 
 interface LibraryProviderProps {
   service: LibraryService
@@ -28,6 +35,7 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
   const [pendingCount, setPendingCount] = useState(0)
   const [version, setVersion] = useState(0)
   const requestRef = useRef(0)
+  const favoritesState = useFavoritesState(service)
 
   useEffect(() => {
     if (service.kind === 'unavailable') {
@@ -156,27 +164,35 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
     [playlists, removeMembership],
   )
 
-  const moveSong = useCallback(
-    async (playlistId: number, membershipId: number, offset: -1 | 1) => {
-      const playlist = playlists.find((entry) => entry.id === playlistId)
-      const order = playlist ? movedMembershipIds(playlist, membershipId, offset) : null
-      if (!order) {
+  const reorderSongs = useCallback(
+    async (playlistId: number, membershipIds: readonly number[]) => {
+      const previous = playlists.find((entry) => entry.id === playlistId)
+      if (!previous) {
         return false
       }
+      setPlaylists((current) => replacePlaylist(current, applyOrder(previous, membershipIds)))
       const updated = await run(
-        () => service.reorder(playlistId, order),
+        () => service.reorder(playlistId, membershipIds),
         'Could not reorder the playlist.',
       )
-      if (updated) {
-        setPlaylists((current) => replacePlaylist(current, updated))
-      }
+      setPlaylists((current) => replacePlaylist(current, updated ?? previous))
       return updated !== null
     },
     [playlists, run, service],
   )
 
+  const moveSong = useCallback(
+    async (playlistId: number, membershipId: number, offset: -1 | 1) => {
+      const playlist = playlists.find((entry) => entry.id === playlistId)
+      const order = playlist ? movedMembershipIds(playlist, membershipId, offset) : null
+      return order ? reorderSongs(playlistId, order) : false
+    },
+    [playlists, reorderSongs],
+  )
+
   const value = useMemo<LibraryActions>(
     () => ({
+      ...favoritesState,
       kind: service.kind,
       status,
       loadError,
@@ -192,10 +208,12 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
       removeSong,
       removeMembership,
       moveSong,
+      reorderSongs,
       playlistsContaining: (songId) =>
         playlists.filter((playlist) => containsSong(playlist, songId)),
     }),
     [
+      favoritesState,
       service.kind,
       status,
       loadError,
@@ -210,6 +228,7 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
       removeSong,
       removeMembership,
       moveSong,
+      reorderSongs,
     ],
   )
 

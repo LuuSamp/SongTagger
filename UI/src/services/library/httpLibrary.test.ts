@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { HttpClient } from '../http/httpClient'
+import { ApiError, type HttpClient } from '../http/httpClient'
 import { createHttpLibrary } from './httpLibrary'
+import { FavoritesUnsupportedError } from './LibraryService'
 
 interface Call {
   method: string
@@ -78,5 +79,46 @@ describe('http library', () => {
 
     await expect(library.resolveUser()).rejects.toThrow('down')
     await expect(library.resolveUser()).resolves.toMatchObject({ id: 3 })
+  })
+
+  it('maps favorites to the agreed contract', async () => {
+    const { http, calls } = fakeHttp({
+      'GET /users/ada': { id: 3, username: 'ada' },
+      'GET /user/3/favorite': { songs: [] },
+      'PUT /user/3/favorite/42': {
+        song_id: 42,
+        title: 'Sampa',
+        artist_credit: 'Caetano Veloso',
+        favorited_at: '',
+      },
+    })
+    const library = createHttpLibrary(http, 'ada')
+
+    await library.listFavorites()
+    await library.addFavorite(42)
+    await library.removeFavorite(42)
+
+    expect(calls.slice(1)).toEqual([
+      { method: 'GET', path: '/user/3/favorite', body: undefined },
+      { method: 'PUT', path: '/user/3/favorite/42', body: {} },
+      { method: 'DELETE', path: '/user/3/favorite/42', body: undefined },
+    ])
+  })
+
+  it('treats a missing favorites route as unsupported but keeps real 404s', async () => {
+    const { http } = fakeHttp({ 'GET /users/ada': { id: 3, username: 'ada' } })
+    const library = createHttpLibrary(http, 'ada')
+    const original = http.get
+    http.get = <T>(path: string) =>
+      path === '/user/3/favorite'
+        ? Promise.reject(new ApiError(404, 'Not Found'))
+        : original<T>(path)
+    await expect(library.listFavorites()).rejects.toBeInstanceOf(FavoritesUnsupportedError)
+
+    http.put = () => Promise.reject(new ApiError(404, 'unknown song'))
+    await expect(library.addFavorite(999)).rejects.toMatchObject({
+      status: 404,
+      message: 'unknown song',
+    })
   })
 })

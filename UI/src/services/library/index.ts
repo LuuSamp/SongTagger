@@ -11,5 +11,5 @@ export function createLibraryService(config: AppConfig): LibraryService {
   return createUnavailableLibrary()
 }
 
-export { LibraryUnavailableError } from './LibraryService'
+export { FavoritesUnsupportedError, LibraryUnavailableError } from './LibraryService'
 export type { LibraryService, LibrarySourceKind } from './LibraryService'

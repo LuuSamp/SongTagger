@@ -16,5 +16,8 @@ export function createUnavailableLibrary(): LibraryService {
     addSong: unavailable,
     removeSong: unavailable,
     reorder: unavailable,
+    listFavorites: unavailable,
+    addFavorite: unavailable,
+    removeFavorite: unavailable,
   }
 }

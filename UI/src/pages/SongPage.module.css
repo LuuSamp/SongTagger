@@ -120,10 +120,18 @@
   text-transform: uppercase;
 }
 
-.actions {
+.cover {
+  position: relative;
+  width: 100%;
+}
+
+.coverActions {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 3;
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .wave {

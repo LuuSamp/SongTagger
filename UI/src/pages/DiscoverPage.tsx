@@ -60,10 +60,15 @@ export function DiscoverPage() {
 }
 
 function ForYou() {
-  const { status: libraryStatus, playlists } = useLibrary()
+  const { status: libraryStatus, playlists, favorites, favoritesStatus } = useLibrary()
+  const favoriteIds = useMemo(() => favorites.map((song) => song.song_id), [favorites])
   const playlistSongIds = useMemo(
-    () => distinctSongIds(playlists, PLAYLIST_SONGS_SAMPLED),
-    [playlists],
+    () =>
+      [...new Set([...favoriteIds, ...distinctSongIds(playlists, PLAYLIST_SONGS_SAMPLED)])].slice(
+        0,
+        PLAYLIST_SONGS_SAMPLED,
+      ),
+    [favoriteIds, playlists],
   )
   const playlistSongs = usePlaylistSongs(playlistSongIds)
   const sampledSongs = playlistSongs.state.data
@@ -73,7 +78,9 @@ function ForYou() {
   )
   const personalized = interests.length > 0
   const deciding =
-    libraryStatus === 'loading' || (playlistSongIds.length > 0 && sampledSongs === null)
+    libraryStatus === 'loading' ||
+    favoritesStatus === 'loading' ||
+    (playlistSongIds.length > 0 && sampledSongs === null)
 
   const { requests, copy } = useMemo(() => {
     const copyById = new Map<string, ShelfCopy>()
@@ -90,8 +97,9 @@ function ForYou() {
   }, [interests, personalized])
 
   const excludeIds = useMemo(
-    () => (personalized ? distinctSongIds(playlists, Number.MAX_SAFE_INTEGER) : []),
-    [playlists, personalized],
+    () =>
+      personalized ? [...favoriteIds, ...distinctSongIds(playlists, Number.MAX_SAFE_INTEGER)] : [],
+    [favoriteIds, playlists, personalized],
   )
   const { state, reload } = useShelves(deciding ? [] : requests, excludeIds, SONGS_PER_SHELF)
   const shelves = visibleShelves(requests, state.data, personalized)
@@ -109,7 +117,7 @@ function ForYou() {
       {personalized ? null : (
         <StateMessage
           title="Make Discovery yours"
-          description="Add songs to a playlist and this page will follow the tags you return to most. Until then, here are some vibes to start from."
+          description="Favorite songs or add them to a playlist, and this page will follow the tags you return to most. Until then, here are some vibes to start from."
         />
       )}
       {state.status === 'error' ? (
@@ -126,7 +134,7 @@ function ForYou() {
       ) : shelves.length === 0 ? (
         <StateMessage
           title="You have heard it all, for now"
-          description="Every song sharing your favorite tags is already in your playlists. Search a new tag above to branch out."
+          description="Every song sharing your favorite tags is already in your favorites or playlists. Search a new tag above to branch out."
         />
       ) : (
         shelves.map(({ request, songs }) => {

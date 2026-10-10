@@ -1,16 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLibrary } from '../app/contexts'
-import { libraryPath, type LibraryTab } from '../app/routes'
+import { APP_PATHS, libraryPath, type LibraryTab } from '../app/routes'
 import { PageShell } from '../components/layout/PageShell'
-import { Button } from '../components/ui/Button'
+import { Button, ButtonLink } from '../components/ui/Button'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Skeleton } from '../components/ui/Skeleton'
 import { StateMessage } from '../components/ui/StateMessage'
-import { playlistSongSummary, type Playlist } from '../domain/library'
-import { songPath } from '../domain/songs'
+import { favoriteSongSummary, type Playlist } from '../domain/library'
 import { PlaylistCard } from '../features/library/PlaylistCard'
-import { SongArtwork } from '../features/songs/SongArtwork'
+import { PlaylistTrackList } from '../features/library/PlaylistTrackList'
+import { SongGrid, SongGridSkeleton } from '../features/songs/SongGrid'
 import styles from './LibraryPage.module.css'
 
 const NAME_LIMIT = 255
@@ -37,18 +37,61 @@ export function LibraryPage() {
           onChange={(next) => navigate(libraryPath(next))}
         />
       </header>
-      {tab === 'favorites' ? <FavoritesPending /> : <Playlists selectedId={selectedId} />}
+      {tab === 'favorites' ? <Favorites /> : <Playlists selectedId={selectedId} />}
     </PageShell>
   )
 }
 
-function FavoritesPending() {
-  return (
-    <StateMessage
-      title="Favorites are not available yet"
-      description="This is a planned feature. The SongTagger API has no favorites endpoints yet (the user_songs table exists but has no routes), so songs cannot be favorited for now. Use playlists to keep the songs you love."
-    />
-  )
+function Favorites() {
+  const { favoritesStatus, favoritesError, favorites, reloadFavorites } = useLibrary()
+
+  if (favoritesStatus === 'unsupported' || favoritesStatus === 'unavailable') {
+    return (
+      <StateMessage
+        title="Favorites are not available yet"
+        description={
+          favoritesStatus === 'unsupported'
+            ? 'This is a planned feature. The SongTagger API does not have favorites endpoints yet (GET, PUT and DELETE on /user/{id}/favorite). The heart on song pages turns on as soon as they exist. Until then, use playlists to keep the songs you love.'
+            : 'Favorites need the SongTagger API. Run the app with VITE_DATA_SOURCE=http.'
+        }
+      />
+    )
+  }
+
+  if (favoritesStatus === 'error') {
+    return (
+      <StateMessage
+        tone="error"
+        title="We could not load your favorites"
+        description={favoritesError}
+        action={
+          <Button variant="secondary" onClick={reloadFavorites}>
+            Try again
+          </Button>
+        }
+      />
+    )
+  }
+
+  if (favoritesStatus === 'loading') {
+    return <SongGridSkeleton count={4} />
+  }
+
+  if (favorites.length === 0) {
+    return (
+      <StateMessage
+        title="No favorites yet"
+        description="Tap the heart on any song page to keep it here."
+        action={
+          <ButtonLink to={APP_PATHS.discover} variant="secondary">
+            Go to Discovery
+          </ButtonLink>
+        }
+      />
+    )
+  }
+
+  return <SongGrid songs={favorites.map(favoriteSongSummary)} />
 }
 
 function Playlists({ selectedId }: { selectedId: number | null }) {
@@ -158,15 +201,7 @@ function CreatePlaylistForm() {
 }
 
 function PlaylistDetail({ playlist }: { playlist: Playlist }) {
-  const {
-    removeMembership,
-    moveSong,
-    deletePlaylist,
-    renamePlaylist,
-    pending,
-    actionError,
-    clearActionError,
-  } = useLibrary()
+  const { deletePlaylist, renamePlaylist, pending, actionError, clearActionError } = useLibrary()
   const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -264,48 +299,7 @@ function PlaylistDetail({ playlist }: { playlist: Playlist }) {
           This playlist is empty. Use “+ Playlist” on a song page to add songs.
         </p>
       ) : (
-        <ol className={styles.tracks}>
-          {playlist.songs.map((song, index) => (
-            <li key={song.membership_id} className={styles.track}>
-              <span className={styles.trackIndex}>{song.position}</span>
-              <SongArtwork song={playlistSongSummary(song)} variant="thumb" />
-              <span className={styles.trackText}>
-                <Link to={songPath({ id: song.song_id })} className={styles.trackTitle}>
-                  {song.title}
-                </Link>
-                <span className={styles.trackArtist}>{song.artist_credit}</span>
-              </span>
-              <span className={styles.trackActions}>
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  onClick={() => moveSong(playlist.id, song.membership_id, -1)}
-                  disabled={pending || index === 0}
-                  aria-label={`Move ${song.title} up`}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  onClick={() => moveSong(playlist.id, song.membership_id, 1)}
-                  disabled={pending || index === playlist.songs.length - 1}
-                  aria-label={`Move ${song.title} down`}
-                >
-                  ↓
-                </button>
-                <Button
-                  variant="ghost"
-                  onClick={() => removeMembership(playlist.id, song.membership_id)}
-                  disabled={pending}
-                  aria-label={`Remove ${song.title} from ${playlist.name}`}
-                >
-                  Remove
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <PlaylistTrackList playlist={playlist} />
       )}
     </section>
   )

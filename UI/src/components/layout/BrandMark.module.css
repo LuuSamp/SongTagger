@@ -3,23 +3,38 @@
   align-items: center;
   gap: var(--space-3);
   flex-shrink: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
   text-decoration: none;
 }
 
 .mark {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--color-ink);
-  color: var(--color-ink-inverse);
-  transition: background-color var(--motion-fast);
+  display: block;
+  width: 50px;
+  height: auto;
+  overflow: visible;
+  transform-origin: 18.75% 50%;
+  transition: transform var(--motion-base);
 }
 
 .brand:hover .mark {
-  background: var(--color-accent-strong);
+  transform: rotate(-8deg);
+}
+
+.tag {
+  fill: currentColor;
+}
+
+.initials {
+  fill: var(--color-ink-inverse);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.slash {
+  fill: var(--color-accent);
 }
 
 .wordmark {
