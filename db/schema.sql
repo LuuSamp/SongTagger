@@ -80,16 +80,26 @@ CREATE TABLE IF NOT EXISTS user_songs (
 
 -- One playlist belongs to one user. Song order lives on playlist_songs.
 -- The same song may appear more than once. Positions are always 1..n.
+-- spotify_playlist_id is null until import or export links the row.
+-- One user stores a Spotify playlist id once. Two users may store the same id.
 
 CREATE TABLE IF NOT EXISTS playlists (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
     name VARCHAR(255) NOT NULL,
+    spotify_playlist_id VARCHAR(255) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    UNIQUE KEY playlists_user_spotify (user_id, spotify_playlist_id),
     KEY playlists_user (user_id),
     CONSTRAINT playlists_user_fk FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE playlists
+    ADD COLUMN IF NOT EXISTS spotify_playlist_id VARCHAR(255) NULL;
+
+ALTER TABLE playlists
+    ADD UNIQUE KEY IF NOT EXISTS playlists_user_spotify (user_id, spotify_playlist_id);
 
 CREATE TABLE IF NOT EXISTS playlist_songs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -100,4 +110,16 @@ CREATE TABLE IF NOT EXISTS playlist_songs (
     UNIQUE KEY playlist_songs_position (playlist_id, position),
     CONSTRAINT playlist_songs_playlist_fk FOREIGN KEY (playlist_id) REFERENCES playlists (id),
     CONSTRAINT playlist_songs_song_fk FOREIGN KEY (song_id) REFERENCES songs (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One Spotify connection per user. A later connect replaces these three fields.
+-- The Spotify client id stays in the environment, not in this table.
+
+CREATE TABLE IF NOT EXISTS user_spotify (
+    user_id BIGINT UNSIGNED NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    PRIMARY KEY (user_id),
+    CONSTRAINT user_spotify_user_fk FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
