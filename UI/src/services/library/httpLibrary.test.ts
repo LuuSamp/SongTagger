@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type HttpClient } from '../http/httpClient'
 import { createHttpLibrary } from './httpLibrary'
-import { FavoritesUnsupportedError } from './LibraryService'
+import { FavoritesUnsupportedError, SpotifyNotConnectedError } from './LibraryService'
 
 interface Call {
   method: string
@@ -103,6 +103,39 @@ describe('http library', () => {
       { method: 'PUT', path: '/user/3/favorite/42', body: {} },
       { method: 'DELETE', path: '/user/3/favorite/42', body: undefined },
     ])
+  })
+
+  it('maps Spotify connect, list, import and export to the user routes', async () => {
+    const { http, calls } = fakeHttp({ 'GET /users/ada': { id: 3, username: 'ada' } })
+    const library = createHttpLibrary(http, 'ada', '/api')
+
+    await expect(library.spotifyConnectUrl()).resolves.toBe('/api/user/3/spotify/start')
+    await library.listSpotifyPlaylists()
+    await library.importSpotifyPlaylist('sp-1')
+    await library.exportToSpotify(9)
+
+    expect(calls.slice(1)).toEqual([
+      { method: 'GET', path: '/user/3/spotify/playlists', body: undefined },
+      { method: 'POST', path: '/user/3/playlist/spotify', body: { spotify_playlist_id: 'sp-1' } },
+      { method: 'POST', path: '/user/3/playlist/9/spotify', body: {} },
+    ])
+  })
+
+  it('maps a missing Spotify connection to its own error but keeps other errors', async () => {
+    const { http } = fakeHttp({ 'GET /users/ada': { id: 3, username: 'ada' } })
+    const library = createHttpLibrary(http, 'ada')
+    const original = http.get
+    http.get = <T>(path: string) =>
+      path === '/user/3/spotify/playlists'
+        ? Promise.reject(new ApiError(400, 'Spotify is not connected'))
+        : original<T>(path)
+    await expect(library.listSpotifyPlaylists()).rejects.toBeInstanceOf(SpotifyNotConnectedError)
+
+    http.post = () => Promise.reject(new ApiError(502, 'Spotify playlist export failed'))
+    await expect(library.exportToSpotify(9)).rejects.toMatchObject({
+      status: 502,
+      message: 'Spotify playlist export failed',
+    })
   })
 
   it('treats a missing favorites route as unsupported but keeps real 404s', async () => {

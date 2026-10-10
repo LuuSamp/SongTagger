@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { libraryPath } from '../../app/routes'
 import { playlistSongSummary, type Playlist } from '../../domain/library'
 import { SongArtwork } from '../songs/SongArtwork'
+import { SpotifyMark } from './SpotifyConnect'
 import styles from './PlaylistCard.module.css'
 
 interface PlaylistCardProps {
@@ -33,6 +34,12 @@ export function PlaylistCard({ playlist, selected }: PlaylistCardProps) {
       <span className={styles.name}>{playlist.name}</span>
       <span className={styles.meta}>
         {count} {count === 1 ? 'song' : 'songs'}
+        {playlist.spotify_playlist_id ? (
+          <span className={styles.linked} title="Linked to a Spotify playlist">
+            <SpotifyMark size={12} />
+            <span className="visually-hidden">Linked to Spotify</span>
+          </span>
+        ) : null}
       </span>
     </Link>
   )

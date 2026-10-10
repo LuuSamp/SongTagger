@@ -190,6 +190,34 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
     [playlists, reorderSongs],
   )
 
+  const spotifyConnectUrl = useCallback(() => service.spotifyConnectUrl(), [service])
+
+  const listSpotifyPlaylists = useCallback(() => service.listSpotifyPlaylists(), [service])
+
+  const importFromSpotify = useCallback(
+    async (spotifyPlaylistId: string) => {
+      const result = await service.importSpotifyPlaylist(spotifyPlaylistId)
+      setPlaylists((current) => replacePlaylist(current, result.playlist))
+      return result
+    },
+    [service],
+  )
+
+  const exportToSpotify = useCallback(
+    async (playlistId: number) => {
+      const result = await service.exportToSpotify(playlistId)
+      setPlaylists((current) =>
+        current.map((playlist) =>
+          playlist.id === playlistId
+            ? { ...playlist, spotify_playlist_id: result.spotify_playlist_id }
+            : playlist,
+        ),
+      )
+      return result
+    },
+    [service],
+  )
+
   const value = useMemo<LibraryActions>(
     () => ({
       ...favoritesState,
@@ -211,6 +239,10 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
       reorderSongs,
       playlistsContaining: (songId) =>
         playlists.filter((playlist) => containsSong(playlist, songId)),
+      spotifyConnectUrl,
+      listSpotifyPlaylists,
+      importFromSpotify,
+      exportToSpotify,
     }),
     [
       favoritesState,
@@ -229,6 +261,10 @@ export function LibraryProvider({ service, children }: LibraryProviderProps) {
       removeMembership,
       moveSong,
       reorderSongs,
+      spotifyConnectUrl,
+      listSpotifyPlaylists,
+      importFromSpotify,
+      exportToSpotify,
     ],
   )
 

@@ -6,10 +6,18 @@ import { createUnavailableLibrary } from './unavailableLibrary'
 
 export function createLibraryService(config: AppConfig): LibraryService {
   if (config.dataSource === 'http') {
-    return createHttpLibrary(createHttpClient(config.apiBaseUrl), config.username)
+    return createHttpLibrary(
+      createHttpClient(config.apiBaseUrl),
+      config.username,
+      config.apiBaseUrl,
+    )
   }
   return createUnavailableLibrary()
 }
 
-export { FavoritesUnsupportedError, LibraryUnavailableError } from './LibraryService'
+export {
+  FavoritesUnsupportedError,
+  LibraryUnavailableError,
+  SpotifyNotConnectedError,
+} from './LibraryService'
 export type { LibraryService, LibrarySourceKind } from './LibraryService'
