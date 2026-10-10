@@ -1,0 +1,66 @@
+.card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.link {
+  display: grid;
+  gap: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.link > :first-child {
+  transition:
+    transform var(--motion-base),
+    box-shadow var(--motion-base);
+}
+
+.link:hover > :first-child {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-soft);
+}
+
+.body {
+  display: grid;
+  gap: 2px;
+}
+
+.title {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.artist {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.matched {
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.mine {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}

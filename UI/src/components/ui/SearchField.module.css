@@ -1,0 +1,60 @@
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.icon {
+  position: absolute;
+  left: var(--space-4);
+  color: var(--color-ink-subtle);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-4) 0 calc(var(--space-4) + 26px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  font-size: var(--text-sm);
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.input::placeholder {
+  color: var(--color-ink-subtle);
+}
+
+.input:hover {
+  border-color: var(--color-line-strong);
+}
+
+.input:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.pill .input {
+  min-height: 42px;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  background: rgb(43 38 34 / 7%);
+}
+
+.pill .input:hover {
+  border-color: transparent;
+  background: rgb(43 38 34 / 10%);
+}
+
+.pill .input:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-surface-raised);
+}
+
+.panel .input {
+  min-height: 52px;
+  font-size: var(--text-md);
+}

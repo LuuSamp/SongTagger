@@ -1,0 +1,31 @@
+.button {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast),
+    color var(--motion-fast),
+    border-color var(--motion-fast),
+    transform var(--motion-fast);
+}
+
+.button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.button:active {
+  transform: scale(0.94);
+}
+
+.button[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}

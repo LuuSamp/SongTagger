@@ -1,0 +1,38 @@
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr);
+  align-items: start;
+  gap: var(--space-7);
+}
+
+.intro {
+  display: grid;
+  gap: var(--space-5);
+  padding-top: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 600;
+}
+
+.pitch {
+  color: var(--color-ink-muted);
+  font-size: var(--text-md);
+}
+
+.begin {
+  width: 100%;
+}
+
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .intro {
+    order: -1;
+    padding-top: 0;
+  }
+}

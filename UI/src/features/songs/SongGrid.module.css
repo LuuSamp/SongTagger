@@ -1,0 +1,25 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-6) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skeletonCard {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.skeletonArt {
+  aspect-ratio: 1;
+  margin-bottom: var(--space-2);
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5) var(--space-3);
+  }
+}
