@@ -5,39 +5,40 @@
 .button {
   display: inline-grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  border: 1px solid var(--color-line-strong);
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--glass-border);
   border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-ink);
+  background: var(--glass-fill);
+  color: var(--glass-ink);
   cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   transition:
     background-color var(--motion-fast),
     border-color var(--motion-fast),
-    color var(--motion-fast);
+    color var(--motion-fast),
+    opacity var(--motion-fast);
 }
 
 .button:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent-strong);
+  background: var(--glass-fill-strong);
 }
 
 .button[aria-pressed='true'] {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: var(--glass-ink);
+  background: var(--glass-ink);
   color: var(--color-accent);
 }
 
 .button[aria-disabled='true'] {
   border-style: dashed;
-  color: var(--color-ink-subtle);
+  opacity: 0.72;
   cursor: help;
 }
 
 .button[aria-disabled='true']:hover {
-  border-color: var(--color-ink-subtle);
-  color: var(--color-ink-muted);
+  opacity: 1;
 }
 
 .button[data-status='loading'] {
@@ -63,7 +64,7 @@
 .note {
   position: absolute;
   top: calc(100% + var(--space-2));
-  left: 0;
+  right: 0;
   z-index: 5;
   width: min(280px, calc(100vw - 2 * var(--layout-gutter)));
   padding: var(--space-3);

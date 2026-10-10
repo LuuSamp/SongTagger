@@ -108,7 +108,7 @@ In-app pages use `AppNavBar`: the round logo, a search pill (tag search → `/di
 Reference mapping:
 - **Landing** follows image 2.
 - **The app bar** follows the third reference.
-- **The song page** follows image 1. The heart and play buttons are not shown: favorites and playback are not implemented.
+- **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart works once the favorites API exists and shows a "coming soon" note until then. The playlist button carries a count badge and opens its panel right-aligned under the cover. The play button is not shown because playback is not implemented.
 
 ## B. Data flow and integrations
 
@@ -142,7 +142,13 @@ Tag edits (`hooks/useTagMutations.ts`):
 | Delete (with inline confirmation) | `deletePlaylist` | `DELETE /user/{id}/playlist/{pid}` | Verified |
 | Add a song (popover checkbox; "Create" also adds) | `addSong` | `POST /user/{id}/playlist/{pid}/song` | Verified |
 | Remove a song (detail row, or popover uncheck = first membership) | `removeSong` | `DELETE /user/{id}/playlist/{pid}/song/{membership_id}`, then `GET` the playlist again | Verified |
-| Move a song up or down | `reorder` | `PUT /user/{id}/playlist/{pid}/order` with the full membership list | Verified |
+| Reorder: drag a song by its grip handle (mouse, pen or touch), or focus the handle and press Arrow Up/Down | `reorder` | `PUT /user/{id}/playlist/{pid}/order` with the full membership list | Verified (mouse drag and keyboard; touch not exercised) |
+
+Reordering (`features/library/PlaylistTrackList.tsx`) works like this:
+- **Drag:** `hooks/useSortableDrag.ts` (pointer events, no library) moves the dragged row with the pointer and slides the rows in between out of the way. It needs 4px of movement before a drag starts, cancels on Escape, auto-scrolls near the viewport edges, and is disabled while a library request is pending.
+- **Animation:** `hooks/useFlipList.ts` animates every order change with FLIP: drops, keyboard moves, and a rollback after a failed save. The global reduced-motion rule shortens it.
+- **Saving:** `reorderSongs` in the provider is optimistic. It applies the new order at once and restores the previous one if the API call fails.
+- **Accessibility:** a polite live region announces "Moved X to position N".
 
 `app/LibraryProvider.tsx` holds `status` (`loading | ready | unavailable | error`), the loaded `Playlist[]`, a shared `pending` flag and `actionError`. Every mutation updates state from the server response, or from a refetch after a 204. Popover checkboxes flip immediately while the request runs and settle on the server state afterwards.
 
@@ -163,6 +169,7 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 | Library in mock mode | `services/library/unavailableLibrary.ts` | Playlists exist only in the API, and no fake persistence is allowed | Every call rejects with `LibraryUnavailableError`. The Library page and the "+ Playlist" popover show "needs the SongTagger API". | Nothing to replace. It is an explicit state, not a mock. |
 | "Demo data" banner | `components/ui/DemoNotice.tsx` | Makes mock mode obvious | Shown only in mock mode | n/a |
 | Acting user from env (`ada`) | `config/session.ts`, `SessionContext` | No login | Static | Replace with authenticated user (see D). |
+| Brand icons for sources | `features/songs/SourceIcon.tsx`, `features/songs/sourceBrands.ts` | Recognisable links | Brand SVG paths and colours from `simple-icons` (CC0, pinned `16.32.0`; only five icons are bundled). Discogs' near-black brand colour is drawn with the ink token for contrast. Unknown sources use a generic link glyph. The icons only link to each service. | Add a mapping in `sourceBrands.ts` for any new source. |
 | Generated artwork | `features/songs/SongArtwork.tsx` | No cover art in the API/DB | Deterministic per song. Playlist songs have no tags, so their artwork uses a hashed palette. | Add cover URLs; keep generated art as fallback. |
 | Vibe collections | `config/vibes.ts` | Editorial config; each vibe is a real tag query | Static | Checked against the seeded DB: every main query (dream-pop, jazz, electronic, mpb, soul, rock) and chip has songs. The chips `modal-jazz`, `hard-bop`, `tropicalia`, `groovy` and `synth-pop` were replaced because they returned nothing or cannot be searched (see D). |
 | Similar songs and Discovery interests | `hooks/useSimilarSongs.ts`, `domain/interests.ts`, `hooks/usePlaylistSongs.ts` | No recommendations endpoint | Real queries, client-side ranking | Replace with a recommendations endpoint. |
@@ -171,15 +178,32 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 
 ## D. Remaining implementation work and known issues
 
-### Favorites (pending, shown explicitly on the site)
-- **What the site shows:** the Library has a "Favorites" tab. It says favorites are not available yet because the API has no favorites endpoints, and suggests playlists instead. The heart button was removed from the song page.
-- **Backend work needed:** routes on `user_songs` with `action = 'like'`. For example `GET /user/{id}/favorite`, `PUT /user/{id}/favorite/{song_id}` and `DELETE /user/{id}/favorite/{song_id}`, ideally returning song documents with tags.
-- **Frontend work after that:**
-  - Add favorites methods to `LibraryService` and `httpLibrary`.
-  - Bring back a `FavoriteButton` on the song page (a previous iteration had one built on localStorage; see git history).
-  - Render favorites with `SongGrid`.
-  - Feed favorites into `topInterests` alongside playlist songs.
-- **Status:** not implemented.
+### Favorites: frontend ready, waiting for the API
+The frontend is complete and switches on by itself once the backend exposes this contract. It follows the playlist routes' style and stores rows in `user_songs` with `action = 'like'`:
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/user/{user_id}/favorite` | none | `{ "songs": FavoriteSong[] }`, newest first |
+| PUT | `/user/{user_id}/favorite/{song_id}` | none (the UI sends `{}`) | 200 `FavoriteSong`; must be idempotent |
+| DELETE | `/user/{user_id}/favorite/{song_id}` | none | 204; must be idempotent |
+
+- **`FavoriteSong`:** `{ song_id: int, title: str, artist_credit: str, favorited_at: datetime }`. Mirrored in `UI/src/domain/library.ts`.
+- **Errors:** `{detail}`, with 404 `"unknown user"` / `"unknown song"` and 400 for `catalog`, as in the playlist routes.
+
+**How the UI detects it** (`services/library/httpLibrary.ts`): when a favorites call answers with FastAPI's route-missing 404 (`{"detail": "Not Found"}`), it raises `FavoritesUnsupportedError` and the favorites status becomes `unsupported`. Any other error is shown as a real error. The browser console therefore logs one expected 404 for `/api/user/{id}/favorite` per page load until the routes exist.
+
+**What the site shows now (`unsupported`):**
+- On the song page, the heart button is dashed and muted (`aria-disabled`). Clicking it shows "Favorites are coming soon. The API does not have favorites endpoints yet."
+- The Library "Favorites" tab explains the feature is planned and names the endpoints.
+
+**What turns on automatically once the routes exist:**
+- The heart becomes an `aria-pressed` toggle. It updates on screen immediately, with a short pop animation, and rolls back with an inline error if the API fails (`app/useFavoritesState.ts`).
+- The Library Favorites tab lists favorites with `SongGrid`, with an empty state when there are none.
+- Discovery's "For you" samples favorites first, then playlist songs, and excludes them from the shelves.
+
+**Status:**
+- Frontend: implemented. Verified against the real API in the `unsupported` state, and against a simulated version of this contract inside the Playwright test (toggle on and off, the Library list, rollback on a 500).
+- Backend: not implemented; it is yours to build.
 
 ### API gaps and inconsistencies found while integrating
 1. **Mixed user addressing.** Catalog routes use `/users/{username}`, while playlist routes use `/user/{user_id}` (singular, numeric). The frontend has to call `GET /users/{username}` first and cache the id. Unifying the routes would remove that round trip.
@@ -198,6 +222,7 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 ### Frontend known issues
 - **Playlist duplicates.** The API allows duplicate songs in a playlist. The detail view shows each row, but unchecking a song in the popover removes only its first membership, so the song stays checked while another copy remains.
 - **No focus trap.** The playlist popover closes on Escape or an outside click.
+- **Drag-and-drop limits.** One song at a time (no multi-select). Auto-scroll happens only near the top and bottom of the window. Touch dragging uses the same pointer code but was not tested on a real device.
 - **Shared pending state.** Library mutations share one `pending` flag, so one slow request briefly disables the other library controls.
 - **StrictMode double fetches.** In development, StrictMode fetches twice (harmless). There is no `AbortController` cancellation.
 - **Local MariaDB is not a Windows service.** It must be started manually after a reboot (command above). Run the MSI installer as administrator if a service is wanted.
@@ -220,6 +245,7 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 
 ### Flows verified against the real API (MariaDB + `python -m API` + `VITE_DATA_SOURCE=http`, 1440 px and 390 px)
 - **Library list:** shows ada's seeded playlists. The Favorites tab shows the pending-feature notice.
+- **Drag and drop:** dragging Giant Steps from 5th to the top gives `Giant Steps, So What, …` in the DOM and in `GET /user/3/playlist/1`. A short drag moves a song past two rows, a click without movement changes nothing, and Arrow Up on a focused handle moves the song and keeps the focus. A mid-drag screenshot shows the lifted row and the shifted rows. The order was restored afterwards.
 - **Playlist detail:** moving Summertime up reorders the playlist, renaming to "Noite Adentro" works, and both survive a reload. Both were reverted afterwards.
 - **Song page popover:**
   - On Sampa, "+ Playlist" shows "Brasil" checked.
@@ -230,4 +256,12 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 - **Tagging:** adding "Garoa Fina" to Sampa stores it with that capitalization, and removing it deletes the row.
 - **Unknown song:** `/songs/999999` shows the not-found state.
 - **Health checks:** no console errors other than the expected 404, and no horizontal overflow on mobile.
+- **Favorites, real API (routes missing):**
+  - The heart shows as unavailable, and clicking it shows the "coming soon" note.
+  - The Library Favorites tab explains what is missing.
+- **Favorites, simulated contract** (Playwright `page.route`, test-only):
+  - Favoriting Teardrop presses the heart, and the song appears in Library → Favorites.
+  - Unfavoriting releases it.
+  - A forced 500 on PUT rolls the heart back and shows "database is down".
+- **Source links:** Teardrop shows the Spotify, Apple Music, YouTube and MusicBrainz brand icons. There is no overflow at 390 px.
 - **Mock mode:** the Library and the popover show the "needs the SongTagger API" state, and Discovery falls back to vibes.

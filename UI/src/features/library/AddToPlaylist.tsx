@@ -8,9 +8,24 @@ const NAME_LIMIT = 255
 
 interface AddToPlaylistProps {
   songId: number
+  songTitle: string
 }
 
-export function AddToPlaylist({ songId }: AddToPlaylistProps) {
+function PlaylistAddIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        d="M4 7h11M4 12h11M4 17h7M18 14v6M15 17h6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+export function AddToPlaylist({ songId, songTitle }: AddToPlaylistProps) {
   const {
     status,
     loadError,
@@ -90,9 +105,20 @@ export function AddToPlaylist({ songId }: AddToPlaylistProps) {
         className={styles.trigger}
         aria-expanded={open}
         aria-controls={panelId}
+        aria-label={
+          inCount > 0
+            ? `Add ${songTitle} to a playlist (in ${inCount} ${inCount === 1 ? 'playlist' : 'playlists'})`
+            : `Add ${songTitle} to a playlist`
+        }
+        title="Add to playlist"
         onClick={toggle}
       >
-        + Playlist{inCount > 0 ? <span className={styles.count}>{inCount}</span> : null}
+        <PlaylistAddIcon />
+        {inCount > 0 ? (
+          <span className={styles.count} aria-hidden="true">
+            {inCount}
+          </span>
+        ) : null}
       </button>
       {open ? (
         <div

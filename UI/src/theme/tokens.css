@@ -17,6 +17,11 @@
   --color-sage: #7f9273;
   --color-sage-soft: #e3e9dc;
 
+  --glass-fill: rgb(20 14 10 / 42%);
+  --glass-fill-strong: rgb(20 14 10 / 62%);
+  --glass-border: rgb(255 250 243 / 28%);
+  --glass-ink: #fffaf3;
+
   --color-danger: #b4432f;
   --color-danger-soft: #f6dfd9;
 
