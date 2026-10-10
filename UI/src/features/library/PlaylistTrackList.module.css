@@ -1,0 +1,101 @@
+.tracks {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  transition:
+    transform var(--motion-base),
+    box-shadow var(--motion-base),
+    scale var(--motion-fast),
+    background-color var(--motion-fast);
+}
+
+.track:hover {
+  background: var(--color-surface);
+}
+
+.track[data-dragging] {
+  z-index: 2;
+  scale: 1.015;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-lifted);
+}
+
+.handle {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-subtle);
+  cursor: grab;
+  touch-action: none;
+  transition:
+    color var(--motion-fast),
+    background-color var(--motion-fast);
+}
+
+.handle:hover,
+.track[data-dragging] .handle {
+  color: var(--color-ink);
+  background: var(--color-line);
+}
+
+.track[data-dragging] .handle {
+  cursor: grabbing;
+}
+
+.handle[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.5;
+}
+
+.position {
+  width: 1.25rem;
+  color: var(--color-ink-subtle);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.title:hover {
+  text-decoration: underline;
+}
+
+.artist {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 860px) {
+  .position {
+    display: none;
+  }
+}

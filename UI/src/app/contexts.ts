@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import type { Playlist } from '../domain/library'
 import type { CatalogService } from '../services/catalog'
 import type { LibrarySourceKind } from '../services/library'
+import type { FavoritesState } from './useFavoritesState'
 
 export interface Session {
   username: string
@@ -12,7 +13,7 @@ export const CatalogContext = createContext<CatalogService | null>(null)
 
 export type LibraryStatus = 'loading' | 'ready' | 'unavailable' | 'error'
 
-export interface LibraryActions {
+export interface LibraryActions extends FavoritesState {
   kind: LibrarySourceKind
   status: LibraryStatus
   loadError: string | null
@@ -28,6 +29,7 @@ export interface LibraryActions {
   removeSong: (playlistId: number, songId: number) => Promise<boolean>
   removeMembership: (playlistId: number, membershipId: number) => Promise<boolean>
   moveSong: (playlistId: number, membershipId: number, offset: -1 | 1) => Promise<boolean>
+  reorderSongs: (playlistId: number, membershipIds: readonly number[]) => Promise<boolean>
   playlistsContaining: (songId: number) => Playlist[]
 }
 

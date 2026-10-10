@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { topInterests } from './interests'
 import {
+  applyOrder,
   containsSong,
   distinctSongIds,
   firstMembership,
   movedMembershipIds,
+  reorderedMembershipIds,
   type Playlist,
   type SongSummary,
 } from './library'
@@ -32,6 +34,24 @@ describe('playlist helpers', () => {
     expect(movedMembershipIds(noite, 12, 1)).toEqual([11, 13, 12])
     expect(movedMembershipIds(noite, 11, -1)).toBeNull()
     expect(movedMembershipIds(noite, 13, 1)).toBeNull()
+  })
+
+  it('moves a membership to any index, shifting the songs in between', () => {
+    expect(reorderedMembershipIds(noite, 13, 0)).toEqual([13, 11, 12])
+    expect(reorderedMembershipIds(noite, 11, 2)).toEqual([12, 13, 11])
+    expect(reorderedMembershipIds(noite, 11, 1)).toEqual([12, 11, 13])
+    expect(reorderedMembershipIds(noite, 12, 1)).toBeNull()
+    expect(reorderedMembershipIds(noite, 99, 0)).toBeNull()
+    expect(reorderedMembershipIds(noite, 11, 3)).toBeNull()
+  })
+
+  it('applies an order and renumbers positions', () => {
+    const reordered = applyOrder(noite, [13, 11, 12])
+    expect(reordered.songs.map((song) => [song.membership_id, song.position])).toEqual([
+      [13, 1],
+      [11, 2],
+      [12, 3],
+    ])
   })
 
   it('lists distinct song ids across playlists up to a limit', () => {

@@ -1,6 +1,12 @@
-import type { LibraryUser, Playlist, PlaylistList } from '../../domain/library'
-import type { HttpClient } from '../http/httpClient'
-import type { LibraryService } from './LibraryService'
+import type {
+  FavoriteList,
+  FavoriteSong,
+  LibraryUser,
+  Playlist,
+  PlaylistList,
+} from '../../domain/library'
+import { ApiError, type HttpClient } from '../http/httpClient'
+import { FavoritesUnsupportedError, type LibraryService } from './LibraryService'
 
 export function createHttpLibrary(http: HttpClient, username: string): LibraryService {
   let userRequest: Promise<LibraryUser> | null = null
@@ -15,9 +21,24 @@ export function createHttpLibrary(http: HttpClient, username: string): LibrarySe
     return userRequest
   }
 
-  async function playlistsPath(suffix = ''): Promise<string> {
+  async function userPath(suffix: string): Promise<string> {
     const user = await resolveUser()
-    return `/user/${user.id}/playlist${suffix}`
+    return `/user/${user.id}${suffix}`
+  }
+
+  async function favorites<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404 && error.message === 'Not Found') {
+        throw new FavoritesUnsupportedError()
+      }
+      throw error
+    }
+  }
+
+  function playlistsPath(suffix = ''): Promise<string> {
+    return userPath(`/playlist${suffix}`)
   }
 
   return {
@@ -48,6 +69,18 @@ export function createHttpLibrary(http: HttpClient, username: string): LibrarySe
       return http.put<Playlist>(await playlistsPath(`/${playlistId}/order`), {
         membership_ids: membershipIds,
       })
+    },
+    async listFavorites() {
+      const path = await userPath('/favorite')
+      return favorites(() => http.get<FavoriteList>(path))
+    },
+    async addFavorite(songId) {
+      const path = await userPath(`/favorite/${songId}`)
+      return favorites(() => http.put<FavoriteSong>(path, {}))
+    },
+    async removeFavorite(songId) {
+      const path = await userPath(`/favorite/${songId}`)
+      await favorites(() => http.delete(path))
     },
   }
 }

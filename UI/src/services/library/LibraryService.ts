@@ -1,4 +1,10 @@
-import type { LibraryUser, Playlist, PlaylistList } from '../../domain/library'
+import type {
+  FavoriteList,
+  FavoriteSong,
+  LibraryUser,
+  Playlist,
+  PlaylistList,
+} from '../../domain/library'
 
 export type LibrarySourceKind = 'http' | 'unavailable'
 
@@ -13,11 +19,21 @@ export interface LibraryService {
   addSong(playlistId: number, songId: number): Promise<Playlist>
   removeSong(playlistId: number, membershipId: number): Promise<void>
   reorder(playlistId: number, membershipIds: readonly number[]): Promise<Playlist>
+  listFavorites(): Promise<FavoriteList>
+  addFavorite(songId: number): Promise<FavoriteSong>
+  removeFavorite(songId: number): Promise<void>
 }
 
 export class LibraryUnavailableError extends Error {
   constructor() {
     super('The Library needs the SongTagger API. Run the UI with VITE_DATA_SOURCE=http.')
     this.name = 'LibraryUnavailableError'
+  }
+}
+
+export class FavoritesUnsupportedError extends Error {
+  constructor() {
+    super('Favorites are coming soon. The API does not have favorites endpoints yet.')
+    this.name = 'FavoritesUnsupportedError'
   }
 }
