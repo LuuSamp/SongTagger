@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from db.covers import fill_song_image, widest_image_url
 from db.manager import open_database
 from db.seed import choose_recording, upsert_recording
 
 from API.Adapters.musicbrainz import RecordingSource
-from API.Adapters.spotify_library import SpotifyItem, SpotifyLibrary, SpotifyLibraryError
+from API.Adapters.spotify_library import SpotifyImage, SpotifyItem, SpotifyLibrary, SpotifyLibraryError
 from API.Services.errors import BadRequest, UpstreamError
 from API.Services.spotify_auth import SpotifyAuth
 
@@ -27,7 +28,7 @@ class SpotifyImport:
     def import_playlist(self, user_id: int, spotify_playlist_id: str) -> tuple[dict, int]:
         access_token = self.auth.access_token(user_id)
         try:
-            name, items = self.library.playlist(access_token, spotify_playlist_id)
+            name, items, image_url = self.library.playlist(access_token, spotify_playlist_id)
         except SpotifyLibraryError as exc:
             if str(exc) == "Spotify did not return this playlist's songs":
                 raise UpstreamError(str(exc)) from exc
@@ -54,6 +55,7 @@ class SpotifyImport:
                 cleaned,
                 song_ids,
                 spotify_playlist_id,
+                image_url,
             )
             connection.commit()
         finally:
@@ -66,19 +68,26 @@ class SpotifyImport:
         with connection.cursor() as cursor:
             existing = _song_by_spotify(cursor, spotify_id)
             if existing is not None:
-                return existing
-            isrc = _usable_isrc(playlist_item.isrc)
-            if isrc is not None:
-                matched = _song_by_isrc(cursor, isrc)
-                if matched is not None:
-                    _store_spotify(cursor, matched, spotify_id)
-                    return matched
-        imported = self._from_musicbrainz(connection, playlist_item)
-        if imported is not None:
-            with connection.cursor() as cursor:
-                _store_spotify(cursor, imported, spotify_id)
-            return imported
-        return _insert_spotify_only(connection, playlist_item, spotify_id)
+                song_id = existing
+            else:
+                song_id = None
+                isrc = _usable_isrc(playlist_item.isrc)
+                if isrc is not None:
+                    matched = _song_by_isrc(cursor, isrc)
+                    if matched is not None:
+                        _store_spotify(cursor, matched, spotify_id)
+                        song_id = matched
+        if song_id is None:
+            imported = self._from_musicbrainz(connection, playlist_item)
+            if imported is not None:
+                with connection.cursor() as cursor:
+                    _store_spotify(cursor, imported, spotify_id)
+                song_id = imported
+            else:
+                song_id = _insert_spotify_only(connection, playlist_item, spotify_id)
+        with connection.cursor() as cursor:
+            _apply_album_image(cursor, song_id, playlist_item)
+        return song_id
 
     def _from_musicbrainz(self, connection, playlist_item: SpotifyItem) -> int | None:
         title = playlist_item.title.strip()
@@ -89,7 +98,7 @@ class SpotifyImport:
             if not chosen or not chosen.get("id"):
                 return None
             recording = self.source.lookup(str(chosen["id"]))
-            return int(upsert_recording(connection, recording))
+            return int(upsert_recording(connection, recording, fetch_track=False))
         except Exception:
             return None
 
@@ -192,6 +201,25 @@ def _playlist_id_for_spotify(cursor, user_id: int, spotify_playlist_id: str) -> 
     return int(row["id"])
 
 
+def _apply_album_image(cursor, song_id: int, playlist_item: SpotifyItem) -> None:
+    fill_song_image(
+        cursor,
+        song_id,
+        None,
+        spotify_image_url=_album_image_url(playlist_item.album_images),
+        fetch_track=False,
+    )
+
+
+def _album_image_url(images: tuple[SpotifyImage, ...]) -> str | None:
+    return widest_image_url(
+        [
+            {"url": image.url, "width": image.width, "height": image.height}
+            for image in images
+        ]
+    )
+
+
 def _write_playlist(
     connection,
     user_id: int,
@@ -199,18 +227,23 @@ def _write_playlist(
     name: str,
     song_ids: list[int],
     spotify_playlist_id: str,
+    image_url: str | None,
 ) -> dict:
+    image_source = "spotify" if image_url else None
     with connection.cursor() as cursor:
         if playlist_id is None:
             cursor.execute(
-                "INSERT INTO playlists (user_id, name, spotify_playlist_id) VALUES (%s, %s, %s)",
-                (user_id, name, spotify_playlist_id),
+                "INSERT INTO playlists "
+                "(user_id, name, spotify_playlist_id, image_url, image_source) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (user_id, name, spotify_playlist_id, image_url, image_source),
             )
             playlist_id = int(cursor.lastrowid)
         else:
             cursor.execute(
-                "UPDATE playlists SET name = %s WHERE id = %s AND user_id = %s",
-                (name, playlist_id, user_id),
+                "UPDATE playlists SET name = %s, image_url = %s, image_source = %s "
+                "WHERE id = %s AND user_id = %s",
+                (name, image_url, image_source, playlist_id, user_id),
             )
             cursor.execute(
                 "DELETE FROM playlist_songs WHERE playlist_id = %s",
@@ -223,12 +256,14 @@ def _write_playlist(
                 (playlist_id, song_id, position),
             )
         cursor.execute(
-            "SELECT id, name, created_at, spotify_playlist_id FROM playlists WHERE id = %s",
+            "SELECT id, name, created_at, spotify_playlist_id, image_url "
+            "FROM playlists WHERE id = %s",
             (playlist_id,),
         )
         playlist = cursor.fetchone()
         cursor.execute(
-            "SELECT ps.id AS membership_id, ps.position, ps.song_id, s.title, s.artist_credit "
+            "SELECT ps.id AS membership_id, ps.position, ps.song_id, s.title, "
+            "s.artist_credit, s.image_url "
             "FROM playlist_songs ps "
             "JOIN songs s ON s.id = ps.song_id "
             "WHERE ps.playlist_id = %s "
@@ -242,6 +277,7 @@ def _write_playlist(
                 "song_id": int(row["song_id"]),
                 "title": row["title"],
                 "artist_credit": row["artist_credit"],
+                "image_url": row["image_url"],
             }
             for row in cursor.fetchall()
         ]
@@ -250,5 +286,6 @@ def _write_playlist(
         "name": playlist["name"],
         "created_at": playlist["created_at"],
         "spotify_playlist_id": playlist["spotify_playlist_id"],
+        "image_url": playlist["image_url"],
         "songs": songs,
     }

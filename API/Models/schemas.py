@@ -31,6 +31,7 @@ class Song(BaseModel):
     mbid: str | None
     isrc: str | None
     disambiguation: str | None
+    image_url: str | None
     sources: list[Source]
     tags: list[Tag]
 
@@ -43,6 +44,7 @@ class UserSong(BaseModel):
     mbid: str | None
     isrc: str | None
     disambiguation: str | None
+    image_url: str | None
     sources: list[Source]
     tags: list[UserTag]
 
@@ -76,6 +78,7 @@ class PlaylistSong(BaseModel):
     song_id: int
     title: str
     artist_credit: str
+    image_url: str | None
 
 
 class PlaylistSummary(BaseModel):
@@ -83,6 +86,7 @@ class PlaylistSummary(BaseModel):
     name: str
     created_at: datetime
     spotify_playlist_id: str | None
+    image_url: str | None
 
 
 class Playlist(PlaylistSummary):

@@ -68,6 +68,7 @@ class SongService:
                     "mbid": song["mbid"],
                     "isrc": song["isrc"],
                     "disambiguation": song["disambiguation"],
+                    "image_url": song["image_url"],
                     "sources": sources.get(song_id, []),
                     "tags": tags.get(song_id, []),
                 }
@@ -78,7 +79,8 @@ class SongService:
         placeholders = ", ".join(["%s"] * len(song_ids))
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT id, title, artist_credit, duration_ms, mbid, isrc, disambiguation "
+                "SELECT id, title, artist_credit, duration_ms, mbid, isrc, disambiguation, "
+                "image_url "
                 f"FROM songs WHERE id IN ({placeholders}) ORDER BY id",
                 tuple(song_ids),
             )

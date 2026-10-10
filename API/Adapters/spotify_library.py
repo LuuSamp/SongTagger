@@ -38,11 +38,12 @@ class SpotifyItem:
     isrc: str | None
     duration_ms: int | None
     usable: bool
+    album_images: tuple[SpotifyImage, ...] = ()
 
 
 class SpotifyLibrary(Protocol):
-    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem]]:
-        """Playlist name and every track item, in Spotify order."""
+    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem], str | None]:
+        """Playlist name, every track item in Spotify order, and the widest cover."""
 
     def playlists(self, access_token: str) -> list[SpotifyPlaylist]:
         """Every playlist on the account, in Spotify order."""
@@ -57,9 +58,10 @@ class HttpxSpotifyLibrary:
         if self._owns_client:
             self._client.close()
 
-    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem]]:
+    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem], str | None]:
         payload = self._get(PLAYLIST_URL.format(playlist_id=quote(playlist_id, safe="")), access_token)
         name = payload.get("name") if isinstance(payload.get("name"), str) else ""
+        image_url = widest_image_url(_parse_images(payload.get("images")))
         page = _track_page(payload)
         if page is None:
             raise SpotifyLibraryError("Spotify did not return this playlist's songs")
@@ -69,7 +71,7 @@ class HttpxSpotifyLibrary:
             page = self._get(next_url, access_token)
             raw_items.extend(page.get("items") or [])
             next_url = page.get("next")
-        return name, [_parse_item(raw) for raw in raw_items]
+        return name, [_parse_item(raw) for raw in raw_items], image_url
 
     def playlists(self, access_token: str) -> list[SpotifyPlaylist]:
         payload = self._get(ME_PLAYLISTS_URL, access_token)
@@ -141,6 +143,19 @@ def _parse_images(raw: object) -> tuple[SpotifyImage, ...]:
     return tuple(images)
 
 
+def widest_image_url(images: tuple[SpotifyImage, ...]) -> str | None:
+    best_url: str | None = None
+    best_width = -1
+    for image in images:
+        width = image.width if image.width is not None else image.height
+        if width is None:
+            width = 0
+        if width > best_width and image.url:
+            best_url = image.url
+            best_width = width
+    return best_url
+
+
 def _image_size(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
@@ -183,6 +198,8 @@ def _parse_item(raw: object) -> SpotifyItem:
     isrc = str(raw_isrc) if raw_isrc else None
     duration = track.get("duration_ms")
     duration_ms = duration if isinstance(duration, int) and not isinstance(duration, bool) else None
+    album = track.get("album")
+    album_images = _parse_images(album.get("images")) if isinstance(album, dict) else ()
     kind = track.get("type")
     wrong_kind = isinstance(kind, str) and kind != "track"
     usable = (
@@ -192,4 +209,4 @@ def _parse_item(raw: object) -> SpotifyItem:
         and bool(spotify_id)
         and bool(title.strip())
     )
-    return SpotifyItem(spotify_id, title, artists, isrc, duration_ms, usable)
+    return SpotifyItem(spotify_id, title, artists, isrc, duration_ms, usable, album_images)

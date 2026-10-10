@@ -15,10 +15,32 @@ const noite: Playlist = {
   id: 7,
   name: 'Noite',
   created_at: '2026-10-10T12:00:00',
+  image_url: null,
   songs: [
-    { membership_id: 11, position: 1, song_id: 6, title: 'So What', artist_credit: 'Miles Davis' },
-    { membership_id: 12, position: 2, song_id: 1, title: 'Sampa', artist_credit: 'Caetano Veloso' },
-    { membership_id: 13, position: 3, song_id: 6, title: 'So What', artist_credit: 'Miles Davis' },
+    {
+      membership_id: 11,
+      position: 1,
+      song_id: 6,
+      title: 'So What',
+      artist_credit: 'Miles Davis',
+      image_url: null,
+    },
+    {
+      membership_id: 12,
+      position: 2,
+      song_id: 1,
+      title: 'Sampa',
+      artist_credit: 'Caetano Veloso',
+      image_url: null,
+    },
+    {
+      membership_id: 13,
+      position: 3,
+      song_id: 6,
+      title: 'So What',
+      artist_credit: 'Miles Davis',
+      image_url: null,
+    },
   ],
 }
 

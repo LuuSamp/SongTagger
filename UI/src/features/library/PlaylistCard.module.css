@@ -19,6 +19,15 @@
   background: var(--color-surface);
 }
 
+.cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-bottom: var(--space-2);
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
 .mosaic {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

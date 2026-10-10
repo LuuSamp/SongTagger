@@ -22,11 +22,22 @@ CREATE TABLE IF NOT EXISTS songs (
     mbid VARCHAR(36) NULL,
     isrc VARCHAR(12) NULL,
     disambiguation TEXT NULL,
+    image_url TEXT NULL,
+    image_source VARCHAR(32) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY songs_mbid (mbid),
     UNIQUE KEY songs_isrc (isrc)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- image_url and image_source are both null or both set.
+-- image_source is cover_art_archive or spotify.
+
+ALTER TABLE songs
+    ADD COLUMN IF NOT EXISTS image_url TEXT NULL;
+
+ALTER TABLE songs
+    ADD COLUMN IF NOT EXISTS image_source VARCHAR(32) NULL;
 
 CREATE TABLE IF NOT EXISTS sources (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -88,6 +99,8 @@ CREATE TABLE IF NOT EXISTS playlists (
     user_id BIGINT UNSIGNED NOT NULL,
     name VARCHAR(255) NOT NULL,
     spotify_playlist_id VARCHAR(255) NULL,
+    image_url TEXT NULL,
+    image_source VARCHAR(32) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY playlists_user_spotify (user_id, spotify_playlist_id),
@@ -100,6 +113,15 @@ ALTER TABLE playlists
 
 ALTER TABLE playlists
     ADD UNIQUE KEY IF NOT EXISTS playlists_user_spotify (user_id, spotify_playlist_id);
+
+-- image_url and image_source are both null or both set.
+-- image_source is spotify when a playlist image is stored.
+
+ALTER TABLE playlists
+    ADD COLUMN IF NOT EXISTS image_url TEXT NULL;
+
+ALTER TABLE playlists
+    ADD COLUMN IF NOT EXISTS image_source VARCHAR(32) NULL;
 
 CREATE TABLE IF NOT EXISTS playlist_songs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -24,7 +24,7 @@ CACHE_PATH = ROOT / "seed_cache.json"
 USER_AGENT = "SongtaggingSeed/0.1 (local catalog seed)"
 REQUEST_INTERVAL = 1.0
 SEARCH_URL = "https://musicbrainz.org/ws/2/recording"
-LOOKUP_INCLUDES = "artist-credits+isrcs+genres+url-rels"
+LOOKUP_INCLUDES = "artist-credits+isrcs+genres+url-rels+releases"
 
 EXCLUDED_DISAMBIGUATION = (
     "live",
@@ -327,11 +327,18 @@ def _song_values(recording: dict) -> tuple:
     return (title, credit, duration_ms, mbid, primary_isrc(recording), disambiguation)
 
 
-def upsert_recording(connection, recording: dict) -> int:
+def upsert_recording(
+    connection,
+    recording: dict,
+    *,
+    spotify_image_url: str | None = None,
+    fetch_track: bool = True,
+) -> int:
     """Insert or update one recording, its source links, and catalog tags.
 
     Match an existing row on ``mbid``, then on ``isrc``. A payload with both
-    empty inserts a new row.
+    empty inserts a new row. Cover lookup is best-effort and never rolls the
+    song back.
     """
     title, credit, duration_ms, mbid, isrc, disambiguation = _song_values(recording)
     if not title or not credit:
@@ -360,6 +367,15 @@ def upsert_recording(connection, recording: dict) -> int:
                 "ON DUPLICATE KEY UPDATE song_id = song_id",
                 (song_id, tag_id, catalog_user_id),
             )
+        from db.covers import fill_song_image
+
+        fill_song_image(
+            cursor,
+            song_id,
+            recording,
+            spotify_image_url=spotify_image_url,
+            fetch_track=fetch_track,
+        )
     return song_id
 
 
