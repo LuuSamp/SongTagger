@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { libraryPath } from '../../app/routes'
-import type { Playlist } from '../../domain/library'
+import { playlistSongSummary, type Playlist } from '../../domain/library'
 import { SongArtwork } from '../songs/SongArtwork'
 import styles from './PlaylistCard.module.css'
 
@@ -21,7 +21,13 @@ export function PlaylistCard({ playlist, selected }: PlaylistCardProps) {
     >
       <span className={styles.mosaic} aria-hidden="true">
         {covers.length > 0
-          ? covers.map((song) => <SongArtwork key={song.id} song={song} variant="tile" />)
+          ? covers.map((song) => (
+              <SongArtwork
+                key={song.membership_id}
+                song={playlistSongSummary(song)}
+                variant="tile"
+              />
+            ))
           : null}
       </span>
       <span className={styles.name}>{playlist.name}</span>

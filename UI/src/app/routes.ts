@@ -45,13 +45,13 @@ export function parseSongId(value: string | undefined): number | null {
 
 export type LibraryTab = 'favorites' | 'playlists'
 
-export function libraryPath(tab: LibraryTab = 'favorites', playlistId?: string): string {
+export function libraryPath(tab: LibraryTab = 'playlists', playlistId?: number): string {
   const params = new URLSearchParams()
-  if (tab !== 'favorites') {
+  if (tab !== 'playlists') {
     params.set('tab', tab)
   }
-  if (playlistId) {
-    params.set('playlist', playlistId)
+  if (playlistId !== undefined) {
+    params.set('playlist', String(playlistId))
   }
   const query = params.toString()
   return query ? `${APP_PATHS.library}?${query}` : APP_PATHS.library

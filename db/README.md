@@ -20,3 +20,11 @@ python -m db.seed      # upsert the recordings in seed_queries.txt from MusicBra
 ```
 
 The seed stays at or under one MusicBrainz request per second. A second run updates the same rows. Lookups are cached in `seed_cache.json`.
+
+## Demo data
+
+```bash
+python -m db.seed_demo
+```
+
+Run it after `python -m db.seed`. It creates the users `ada` and `bia`, adds their feeling and instrument tags to well-known seeded songs, and creates two playlists for each user (ada: Noite, Brasil; bia: Guitarras, Pista). It is safe to run again: tags are idempotent and a playlist is skipped when that user already has one with the same name. Songs missing from the catalog are reported and skipped.

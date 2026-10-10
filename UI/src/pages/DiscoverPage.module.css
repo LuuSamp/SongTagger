@@ -23,3 +23,8 @@
   display: grid;
   gap: var(--space-7);
 }
+
+.status {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}

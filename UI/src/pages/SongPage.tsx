@@ -9,7 +9,6 @@ import { StateMessage } from '../components/ui/StateMessage'
 import { catalogSources, formatDuration, listeningSources } from '../domain/songs'
 import type { TagKind, UserSong } from '../domain/types'
 import { AddToPlaylist } from '../features/library/AddToPlaylist'
-import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
 import { SongArtwork } from '../features/songs/SongArtwork'
 import { SourceLinks } from '../features/songs/SourceLinks'
@@ -140,8 +139,7 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
         </header>
 
         <div className={styles.actions}>
-          <FavoriteButton song={song} />
-          <AddToPlaylist song={song} />
+          <AddToPlaylist songId={song.id} />
         </div>
 
         <SourceLinks label="Listen on:" sources={listenOn} />

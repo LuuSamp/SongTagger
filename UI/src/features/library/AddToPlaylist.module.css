@@ -113,3 +113,14 @@
 .input:focus-visible {
   border-color: var(--color-accent);
 }
+
+.error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.errorBox {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}

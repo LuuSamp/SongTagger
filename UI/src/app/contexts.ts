@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Library, Playlist, SongSummary } from '../domain/library'
+import type { Playlist } from '../domain/library'
 import type { CatalogService } from '../services/catalog'
 import type { LibrarySourceKind } from '../services/library'
 
@@ -10,15 +10,24 @@ export interface Session {
 export const SessionContext = createContext<Session | null>(null)
 export const CatalogContext = createContext<CatalogService | null>(null)
 
+export type LibraryStatus = 'loading' | 'ready' | 'unavailable' | 'error'
+
 export interface LibraryActions {
   kind: LibrarySourceKind
-  library: Library
-  isFavorite: (songId: number) => boolean
-  toggleFavorite: (song: SongSummary) => void
-  createPlaylist: (name: string) => Playlist | null
-  deletePlaylist: (playlistId: string) => void
-  addToPlaylist: (playlistId: string, song: SongSummary) => void
-  removeFromPlaylist: (playlistId: string, songId: number) => void
+  status: LibraryStatus
+  loadError: string | null
+  playlists: Playlist[]
+  actionError: string | null
+  pending: boolean
+  reload: () => void
+  clearActionError: () => void
+  createPlaylist: (name: string) => Promise<Playlist | null>
+  renamePlaylist: (playlistId: number, name: string) => Promise<boolean>
+  deletePlaylist: (playlistId: number) => Promise<boolean>
+  addSong: (playlistId: number, songId: number) => Promise<boolean>
+  removeSong: (playlistId: number, songId: number) => Promise<boolean>
+  removeMembership: (playlistId: number, membershipId: number) => Promise<boolean>
+  moveSong: (playlistId: number, membershipId: number, offset: -1 | 1) => Promise<boolean>
   playlistsContaining: (songId: number) => Playlist[]
 }
 

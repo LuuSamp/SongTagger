@@ -49,16 +49,18 @@ export function useTagMutations({ songId, update, reload }: UseTagMutationsOptio
         setError('Type a tag before adding it.')
         return false
       }
-      const request = { kind: write.kind, token }
-      const key = tagKey(request)
+      const name = displayTagName(write.token)
+      const local = { kind: write.kind, token }
+      const key = tagKey(local)
       setError(null)
       track(key, true)
-      update((song) =>
-        withTag(song, { ...request, name: displayTagName(write.token), applied_by_me: true }),
-      )
+      update((song) => withTag(song, { ...local, name, applied_by_me: true }))
       try {
-        const saved = await catalog.addTag(songId, request)
-        update((song) => withTag(withoutMyTag(song, request), saved))
+        const saved = await catalog.addTag(songId, {
+          kind: write.kind,
+          token: name.replace(/ /g, '-'),
+        })
+        update((song) => withTag(withoutMyTag(song, local), saved))
         return true
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not add the tag.')

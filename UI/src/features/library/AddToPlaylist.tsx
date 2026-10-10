@@ -1,17 +1,31 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useLibrary } from '../../app/contexts'
 import { Button } from '../../components/ui/Button'
-import type { SongSummary } from '../../domain/library'
+import { containsSong } from '../../domain/library'
 import styles from './AddToPlaylist.module.css'
 
+const NAME_LIMIT = 255
+
 interface AddToPlaylistProps {
-  song: SongSummary
+  songId: number
 }
 
-export function AddToPlaylist({ song }: AddToPlaylistProps) {
-  const { library, createPlaylist, addToPlaylist, removeFromPlaylist } = useLibrary()
+export function AddToPlaylist({ songId }: AddToPlaylistProps) {
+  const {
+    status,
+    loadError,
+    playlists,
+    pending,
+    actionError,
+    clearActionError,
+    reload,
+    createPlaylist,
+    addSong,
+    removeSong,
+  } = useLibrary()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
+  const [optimistic, setOptimistic] = useState<ReadonlyMap<number, boolean>>(new Map())
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelId = useId()
@@ -39,18 +53,34 @@ export function AddToPlaylist({ song }: AddToPlaylistProps) {
     }
   }, [open])
 
-  function handleCreate(event: FormEvent<HTMLFormElement>) {
+  function toggle() {
+    clearActionError()
+    setOpen((value) => !value)
+  }
+
+  async function setMembership(playlistId: number, include: boolean) {
+    setOptimistic((current) => new Map(current).set(playlistId, include))
+    if (include) {
+      await addSong(playlistId, songId)
+    } else {
+      await removeSong(playlistId, songId)
+    }
+    setOptimistic((current) => {
+      const next = new Map(current)
+      next.delete(playlistId)
+      return next
+    })
+  }
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const playlist = createPlaylist(name)
-    if (playlist) {
-      addToPlaylist(playlist.id, song)
+    const playlist = await createPlaylist(name)
+    if (playlist && (await addSong(playlist.id, songId))) {
       setName('')
     }
   }
 
-  const inCount = library.playlists.filter((playlist) =>
-    playlist.songs.some((entry) => entry.id === song.id),
-  ).length
+  const inCount = playlists.filter((playlist) => containsSong(playlist, songId)).length
 
   return (
     <div className={styles.wrapper} ref={wrapperRef}>
@@ -60,55 +90,81 @@ export function AddToPlaylist({ song }: AddToPlaylistProps) {
         className={styles.trigger}
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
       >
         + Playlist{inCount > 0 ? <span className={styles.count}>{inCount}</span> : null}
       </button>
       {open ? (
-        <div id={panelId} className={styles.panel} role="group" aria-label="Add to playlists">
+        <div
+          id={panelId}
+          className={styles.panel}
+          role="group"
+          aria-label="Add to playlists"
+          aria-busy={pending || status === 'loading' || undefined}
+        >
           <p className={styles.heading}>Save to playlist</p>
-          {library.playlists.length > 0 ? (
-            <ul className={styles.list}>
-              {library.playlists.map((playlist) => {
-                const checked = playlist.songs.some((entry) => entry.id === song.id)
-                return (
-                  <li key={playlist.id}>
-                    <label className={styles.option}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() =>
-                          checked
-                            ? removeFromPlaylist(playlist.id, song.id)
-                            : addToPlaylist(playlist.id, song)
-                        }
-                      />
-                      <span>{playlist.name}</span>
-                    </label>
-                  </li>
-                )
-              })}
-            </ul>
+          {status === 'unavailable' ? (
+            <p className={styles.empty}>
+              Playlists need the SongTagger API. Run the app with VITE_DATA_SOURCE=http.
+            </p>
+          ) : status === 'error' ? (
+            <div className={styles.errorBox}>
+              <p className={styles.error}>{loadError}</p>
+              <Button variant="secondary" onClick={reload}>
+                Try again
+              </Button>
+            </div>
+          ) : status === 'loading' ? (
+            <p className={styles.empty}>Loading your playlists…</p>
           ) : (
-            <p className={styles.empty}>No playlists yet.</p>
+            <>
+              {playlists.length > 0 ? (
+                <ul className={styles.list}>
+                  {playlists.map((playlist) => {
+                    const saving = optimistic.has(playlist.id)
+                    const checked = optimistic.get(playlist.id) ?? containsSong(playlist, songId)
+                    return (
+                      <li key={playlist.id}>
+                        <label className={styles.option}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={saving}
+                            onChange={() => setMembership(playlist.id, !checked)}
+                          />
+                          <span>{playlist.name}</span>
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <p className={styles.empty}>No playlists yet.</p>
+              )}
+              <form className={styles.create} onSubmit={handleCreate}>
+                <label className="visually-hidden" htmlFor={`${panelId}-name`}>
+                  New playlist name
+                </label>
+                <input
+                  id={`${panelId}-name`}
+                  className={styles.input}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="New playlist"
+                  maxLength={NAME_LIMIT}
+                  autoComplete="off"
+                />
+                <Button type="submit" disabled={!name.trim()} busy={pending}>
+                  Create
+                </Button>
+              </form>
+              {actionError ? (
+                <p className={styles.error} role="alert">
+                  {actionError}
+                </p>
+              ) : null}
+            </>
           )}
-          <form className={styles.create} onSubmit={handleCreate}>
-            <label className="visually-hidden" htmlFor={`${panelId}-name`}>
-              New playlist name
-            </label>
-            <input
-              id={`${panelId}-name`}
-              className={styles.input}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="New playlist"
-              maxLength={80}
-              autoComplete="off"
-            />
-            <Button type="submit" disabled={!name.trim()}>
-              Create
-            </Button>
-          </form>
         </div>
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-import type { CatalogSong, Tag } from './types'
+import type { Tag } from './types'
 
 export interface SongSummary {
   id: number
@@ -7,87 +7,70 @@ export interface SongSummary {
   tags: Tag[]
 }
 
-export interface Playlist {
-  id: string
+export interface LibraryUser {
+  id: number
+  username: string
+}
+
+export interface PlaylistSummary {
+  id: number
   name: string
-  createdAt: string
-  songs: SongSummary[]
+  created_at: string
 }
 
-export interface Library {
-  favorites: SongSummary[]
-  playlists: Playlist[]
+export interface PlaylistSong {
+  membership_id: number
+  position: number
+  song_id: number
+  title: string
+  artist_credit: string
 }
 
-export const EMPTY_LIBRARY: Library = { favorites: [], playlists: [] }
+export interface Playlist extends PlaylistSummary {
+  songs: PlaylistSong[]
+}
 
-export function toSongSummary(song: SongSummary | CatalogSong): SongSummary {
-  return {
-    id: song.id,
-    title: song.title,
-    artist_credit: song.artist_credit,
-    tags: song.tags.map(({ kind, name, token }) => ({ kind, name, token })),
+export interface PlaylistList {
+  playlists: PlaylistSummary[]
+}
+
+export function playlistSongSummary(song: PlaylistSong): SongSummary {
+  return { id: song.song_id, title: song.title, artist_credit: song.artist_credit, tags: [] }
+}
+
+export function containsSong(playlist: Playlist, songId: number): boolean {
+  return playlist.songs.some((song) => song.song_id === songId)
+}
+
+export function firstMembership(playlist: Playlist, songId: number): PlaylistSong | null {
+  return playlist.songs.find((song) => song.song_id === songId) ?? null
+}
+
+export function movedMembershipIds(
+  playlist: Playlist,
+  membershipId: number,
+  offset: -1 | 1,
+): number[] | null {
+  const ids = playlist.songs.map((song) => song.membership_id)
+  const from = ids.indexOf(membershipId)
+  const to = from + offset
+  if (from < 0 || to < 0 || to >= ids.length) {
+    return null
   }
+  const reordered = [...ids]
+  reordered.splice(from, 1)
+  reordered.splice(to, 0, membershipId)
+  return reordered
 }
 
-export function isFavorite(library: Library, songId: number): boolean {
-  return library.favorites.some((song) => song.id === songId)
-}
-
-export function toggleFavorite(library: Library, song: SongSummary): Library {
-  if (isFavorite(library, song.id)) {
-    return { ...library, favorites: library.favorites.filter((entry) => entry.id !== song.id) }
+export function distinctSongIds(playlists: readonly Playlist[], limit: number): number[] {
+  const ids: number[] = []
+  for (const playlist of playlists) {
+    for (const song of playlist.songs) {
+      if (!ids.includes(song.song_id)) {
+        ids.push(song.song_id)
+      }
+    }
   }
-  return { ...library, favorites: [toSongSummary(song), ...library.favorites] }
-}
-
-export function createPlaylist(library: Library, playlist: Playlist): Library {
-  return { ...library, playlists: [playlist, ...library.playlists] }
-}
-
-export function deletePlaylist(library: Library, playlistId: string): Library {
-  return {
-    ...library,
-    playlists: library.playlists.filter((playlist) => playlist.id !== playlistId),
-  }
-}
-
-function updatePlaylist(
-  library: Library,
-  playlistId: string,
-  change: (playlist: Playlist) => Playlist,
-): Library {
-  return {
-    ...library,
-    playlists: library.playlists.map((playlist) =>
-      playlist.id === playlistId ? change(playlist) : playlist,
-    ),
-  }
-}
-
-export function addToPlaylist(library: Library, playlistId: string, song: SongSummary): Library {
-  return updatePlaylist(library, playlistId, (playlist) =>
-    playlist.songs.some((entry) => entry.id === song.id)
-      ? playlist
-      : { ...playlist, songs: [...playlist.songs, toSongSummary(song)] },
-  )
-}
-
-export function removeFromPlaylist(library: Library, playlistId: string, songId: number): Library {
-  return updatePlaylist(library, playlistId, (playlist) => ({
-    ...playlist,
-    songs: playlist.songs.filter((entry) => entry.id !== songId),
-  }))
-}
-
-export function playlistsContaining(library: Library, songId: number): Playlist[] {
-  return library.playlists.filter((playlist) => playlist.songs.some((song) => song.id === songId))
-}
-
-export function isLibrary(value: unknown): value is Library {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const candidate = value as Partial<Library>
-  return Array.isArray(candidate.favorites) && Array.isArray(candidate.playlists)
+  return ids.slice(0, limit)
 }

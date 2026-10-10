@@ -7,9 +7,11 @@ import { Button } from '../components/ui/Button'
 import { StateMessage } from '../components/ui/StateMessage'
 import { featuredVibes } from '../config/vibes'
 import { topInterests } from '../domain/interests'
+import { distinctSongIds } from '../domain/library'
 import { SearchPanel } from '../features/discovery/SearchPanel'
 import { SearchResults } from '../features/discovery/SearchResults'
 import { SongShelf } from '../features/discovery/SongShelf'
+import { usePlaylistSongs } from '../hooks/usePlaylistSongs'
 import { useShelves, type Shelf, type ShelfRequest } from '../hooks/useShelves'
 import { useSongSearch } from '../hooks/useSongSearch'
 import styles from './DiscoverPage.module.css'
@@ -18,6 +20,7 @@ const SEARCH_INPUT_ID = 'discover-search'
 const SONGS_PER_SHELF = 5
 const VISIBLE_SHELVES = 3
 const CANDIDATE_INTERESTS = 6
+const PLAYLIST_SONGS_SAMPLED = 12
 
 interface ShelfCopy {
   eyebrow: string
@@ -57,12 +60,20 @@ export function DiscoverPage() {
 }
 
 function ForYou() {
-  const { library } = useLibrary()
+  const { status: libraryStatus, playlists } = useLibrary()
+  const playlistSongIds = useMemo(
+    () => distinctSongIds(playlists, PLAYLIST_SONGS_SAMPLED),
+    [playlists],
+  )
+  const playlistSongs = usePlaylistSongs(playlistSongIds)
+  const sampledSongs = playlistSongs.state.data
   const interests = useMemo(
-    () => topInterests(library.favorites, CANDIDATE_INTERESTS),
-    [library.favorites],
+    () => topInterests(sampledSongs ?? [], CANDIDATE_INTERESTS),
+    [sampledSongs],
   )
   const personalized = interests.length > 0
+  const deciding =
+    libraryStatus === 'loading' || (playlistSongIds.length > 0 && sampledSongs === null)
 
   const { requests, copy } = useMemo(() => {
     const copyById = new Map<string, ShelfCopy>()
@@ -79,18 +90,26 @@ function ForYou() {
   }, [interests, personalized])
 
   const excludeIds = useMemo(
-    () => (personalized ? library.favorites.map((song) => song.id) : []),
-    [library.favorites, personalized],
+    () => (personalized ? distinctSongIds(playlists, Number.MAX_SAFE_INTEGER) : []),
+    [playlists, personalized],
   )
-  const { state, reload } = useShelves(requests, excludeIds, SONGS_PER_SHELF)
+  const { state, reload } = useShelves(deciding ? [] : requests, excludeIds, SONGS_PER_SHELF)
   const shelves = visibleShelves(requests, state.data, personalized)
+
+  if (deciding) {
+    return (
+      <p className={styles.status} role="status">
+        Looking at your playlists…
+      </p>
+    )
+  }
 
   return (
     <section className={styles.forYou} aria-label="For you">
       {personalized ? null : (
         <StateMessage
           title="Make Discovery yours"
-          description="Favorite a few songs and this page will follow the tags you return to most. Until then, here are some vibes to start from."
+          description="Add songs to a playlist and this page will follow the tags you return to most. Until then, here are some vibes to start from."
         />
       )}
       {state.status === 'error' ? (
@@ -107,7 +126,7 @@ function ForYou() {
       ) : shelves.length === 0 ? (
         <StateMessage
           title="You have heard it all, for now"
-          description="Every song sharing your favorite tags is already in your library. Search a new tag above to branch out."
+          description="Every song sharing your favorite tags is already in your playlists. Search a new tag above to branch out."
         />
       ) : (
         shelves.map(({ request, songs }) => {

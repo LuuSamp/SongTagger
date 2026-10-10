@@ -28,7 +28,7 @@ export const featuredVibes: Vibe[] = [
     title: 'Late-Night Jazz',
     description: 'Smoky rooms, modal turns, slow burn.',
     query: 'jazz',
-    relatedTags: ['jazz', 'modal-jazz', 'hard-bop'],
+    relatedTags: ['jazz', 'vocal-jazz', 'late-night'],
     palette: { base: '#1f2340', glow: '#3a3f6b', accent: '#d7a64a', ink: '#f6ecd9' },
   },
   {
@@ -36,7 +36,7 @@ export const featuredVibes: Vibe[] = [
     title: 'Electronic Futures',
     description: 'Pulses, synths and forward motion.',
     query: 'electronic',
-    relatedTags: ['electronic', 'french-house', 'synth-pop'],
+    relatedTags: ['electronic', 'house', 'french-house'],
     palette: { base: '#0f1a33', glow: '#123a5a', accent: '#7ff0e0', ink: '#e8fbff' },
   },
 ]
@@ -45,9 +45,9 @@ export const moreVibes: Vibe[] = [
   {
     id: 'brazil',
     title: 'Sun-soaked Brazil',
-    description: 'MPB, bossa nova and tropicália.',
+    description: 'MPB, bossa nova and samba.',
     query: 'mpb',
-    relatedTags: ['mpb', 'bossa-nova', 'tropicalia'],
+    relatedTags: ['mpb', 'bossa-nova', 'samba'],
     palette: { base: '#f0c9a4', glow: '#fbe7c8', accent: '#c46a4e', ink: '#3a2418' },
   },
   {
@@ -55,7 +55,7 @@ export const moreVibes: Vibe[] = [
     title: 'Soul & Groove',
     description: 'Warm voices over deep pockets.',
     query: 'soul',
-    relatedTags: ['soul', 'funk', 'groovy'],
+    relatedTags: ['soul', 'funk', 'neo-soul'],
     palette: { base: '#6b3a2a', glow: '#a2563a', accent: '#f0c27b', ink: '#fbefe2' },
   },
   {

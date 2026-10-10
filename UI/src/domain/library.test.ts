@@ -1,14 +1,44 @@
 import { describe, expect, it } from 'vitest'
 import { topInterests } from './interests'
 import {
-  addToPlaylist,
-  createPlaylist,
-  EMPTY_LIBRARY,
-  playlistsContaining,
-  removeFromPlaylist,
-  toggleFavorite,
+  containsSong,
+  distinctSongIds,
+  firstMembership,
+  movedMembershipIds,
+  type Playlist,
   type SongSummary,
 } from './library'
+
+const noite: Playlist = {
+  id: 7,
+  name: 'Noite',
+  created_at: '2026-10-10T12:00:00',
+  songs: [
+    { membership_id: 11, position: 1, song_id: 6, title: 'So What', artist_credit: 'Miles Davis' },
+    { membership_id: 12, position: 2, song_id: 1, title: 'Sampa', artist_credit: 'Caetano Veloso' },
+    { membership_id: 13, position: 3, song_id: 6, title: 'So What', artist_credit: 'Miles Davis' },
+  ],
+}
+
+describe('playlist helpers', () => {
+  it('finds songs and their first membership, duplicates included', () => {
+    expect(containsSong(noite, 6)).toBe(true)
+    expect(containsSong(noite, 99)).toBe(false)
+    expect(firstMembership(noite, 6)?.membership_id).toBe(11)
+  })
+
+  it('builds the full membership order for a move, refusing moves past the ends', () => {
+    expect(movedMembershipIds(noite, 12, -1)).toEqual([12, 11, 13])
+    expect(movedMembershipIds(noite, 12, 1)).toEqual([11, 13, 12])
+    expect(movedMembershipIds(noite, 11, -1)).toBeNull()
+    expect(movedMembershipIds(noite, 13, 1)).toBeNull()
+  })
+
+  it('lists distinct song ids across playlists up to a limit', () => {
+    expect(distinctSongIds([noite], 10)).toEqual([6, 1])
+    expect(distinctSongIds([noite], 1)).toEqual([6])
+  })
+})
 
 const sampa: SongSummary = {
   id: 1,
@@ -32,34 +62,13 @@ const baby: SongSummary = {
   ],
 }
 
-describe('library reducers', () => {
-  it('toggles favorites without duplicating', () => {
-    const once = toggleFavorite(EMPTY_LIBRARY, sampa)
-    expect(once.favorites.map((song) => song.id)).toEqual([1])
-    expect(toggleFavorite(once, sampa).favorites).toEqual([])
-  })
-
-  it('adds and removes playlist songs idempotently', () => {
-    const withPlaylist = createPlaylist(EMPTY_LIBRARY, {
-      id: 'p1',
-      name: 'Noite',
-      createdAt: '2026-10-10T00:00:00.000Z',
-      songs: [],
-    })
-    const added = addToPlaylist(addToPlaylist(withPlaylist, 'p1', sampa), 'p1', sampa)
-    expect(added.playlists[0]?.songs).toHaveLength(1)
-    expect(playlistsContaining(added, 1).map((playlist) => playlist.name)).toEqual(['Noite'])
-    expect(removeFromPlaylist(added, 'p1', 1).playlists[0]?.songs).toEqual([])
-  })
-})
-
 describe('topInterests', () => {
-  it('puts tags shared by several favorites first, then alternates between songs', () => {
+  it('puts tags shared by several songs first, then alternates between songs', () => {
     const interests = topInterests([sampa, baby], 3)
     expect(interests.map((interest) => interest.token)).toEqual(['mpb', 'warm', 'guitar'])
   })
 
-  it('draws from every favorite when nothing is shared', () => {
+  it('draws from every song when nothing is shared', () => {
     const soWhat: SongSummary = {
       id: 6,
       title: 'So What',
@@ -74,7 +83,7 @@ describe('topInterests', () => {
     expect(interests.map((interest) => interest.token)).toEqual(['cool-jazz', 'mpb', 'jazz'])
   })
 
-  it('returns nothing without favorites', () => {
+  it('returns nothing without songs', () => {
     expect(topInterests([])).toEqual([])
   })
 })
