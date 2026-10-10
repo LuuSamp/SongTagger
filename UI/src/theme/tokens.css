@@ -17,6 +17,11 @@
   --color-sage: #7f9273;
   --color-sage-soft: #e3e9dc;
 
+  --tag-artist: #2b2622;
+  --tag-genre: #6f8463;
+  --tag-feeling: #c46a4e;
+  --tag-instrument: #d9a441;
+
   --glass-fill: rgb(20 14 10 / 42%);
   --glass-fill-strong: rgb(20 14 10 / 62%);
   --glass-border: rgb(255 250 243 / 28%);
