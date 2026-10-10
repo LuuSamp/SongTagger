@@ -8,11 +8,16 @@
   color: var(--art-ink);
 }
 
-.canvas {
+.canvas,
+.photo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+.photo {
+  object-fit: cover;
 }
 
 .card {

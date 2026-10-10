@@ -15,6 +15,7 @@ export interface FixtureSong {
   mbid: string | null
   isrc: string | null
   disambiguation: string | null
+  image_url: string | null
   sources: Source[]
   tags: FixtureTagApplication[]
 }
@@ -70,6 +71,7 @@ function song(input: FixtureInput): FixtureSong {
     mbid,
     isrc: input.isrc ?? null,
     disambiguation: input.disambiguation ?? null,
+    image_url: null,
     sources,
     tags: [
       { kind: 'artist', name: input.artist, appliedBy: MOCK_CATALOG_USER },

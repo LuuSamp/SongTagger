@@ -10,7 +10,12 @@ from fastapi.testclient import TestClient
 
 from db.manager import open_database
 
-from API.Adapters.spotify_library import HttpxSpotifyLibrary, SpotifyItem, SpotifyLibraryError
+from API.Adapters.spotify_library import (
+    HttpxSpotifyLibrary,
+    SpotifyImage,
+    SpotifyItem,
+    SpotifyLibraryError,
+)
 from API.app import create_app
 from tests.conftest import FakeSource, count_rows, insert_song, insert_user
 
@@ -19,14 +24,15 @@ class FakeLibrary:
     def __init__(self) -> None:
         self.name = "Night Drive"
         self.items: list[SpotifyItem] = []
+        self.image_url: str | None = None
         self.error: Exception | None = None
         self.calls: list[tuple[str, str]] = []
 
-    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem]]:
+    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem], str | None]:
         self.calls.append((access_token, playlist_id))
         if self.error is not None:
             raise self.error
-        return self.name, list(self.items)
+        return self.name, list(self.items), self.image_url
 
 
 @pytest.fixture
@@ -339,8 +345,9 @@ def test_http_library_reads_every_track_page() -> None:
         return httpx.Response(404)
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as http:
-        name, items = HttpxSpotifyLibrary(http).playlist("token-1", "pl-1")
+        name, items, image_url = HttpxSpotifyLibrary(http).playlist("token-1", "pl-1")
 
+    assert image_url is None
     assert seen == [
         "https://api.spotify.com/v1/playlists/pl-1",
         "https://api.spotify.com/v1/playlists/pl-1/tracks?offset=100&limit=100",
@@ -409,8 +416,9 @@ def test_http_library_reads_the_current_items_shape() -> None:
         return httpx.Response(404)
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as http:
-        name, items = HttpxSpotifyLibrary(http).playlist("token-1", "pl-1")
+        name, items, image_url = HttpxSpotifyLibrary(http).playlist("token-1", "pl-1")
 
+    assert image_url is None
     assert name == "Night Drive"
     assert items == [
         SpotifyItem("t1", "First", ("A",), "USRC17607839", 1000, True),
@@ -418,6 +426,99 @@ def test_http_library_reads_the_current_items_shape() -> None:
         SpotifyItem("ep-1", "Talk", (), None, None, False),
         SpotifyItem("t2", "Second", ("C",), None, 2000, True),
     ]
+
+
+def test_spotify_playlist_import_stores_and_updates_the_playlist_image(
+    client, library: FakeLibrary
+) -> None:
+    user_id = insert_user("ada")
+    connect_spotify(user_id)
+    library.image_url = "https://i.scdn.co/image/first"
+    library.items = [item("t1", "One", ("A",))]
+
+    imported = _import(client, user_id, "spotify-pl")
+    assert imported.status_code == 201
+    playlist = imported.json()["playlist"]
+    assert playlist["image_url"] == "https://i.scdn.co/image/first"
+    assert _playlist_image(playlist["id"]) == ("https://i.scdn.co/image/first", "spotify")
+
+    library.image_url = "https://i.scdn.co/image/second"
+    again = _import(client, user_id, "spotify-pl")
+    assert again.status_code == 200
+    assert again.json()["playlist"]["image_url"] == "https://i.scdn.co/image/second"
+    assert _playlist_image(playlist["id"]) == ("https://i.scdn.co/image/second", "spotify")
+
+
+def test_import_stores_the_widest_album_image_from_the_track(
+    client, library: FakeLibrary, monkeypatch
+) -> None:
+    def fail_track(track_id: str) -> str:
+        raise AssertionError(track_id)
+
+    monkeypatch.setattr("db.covers.fetch_track_image", fail_track)
+    user_id = insert_user("ada")
+    connect_spotify(user_id)
+    library.items = [
+        item(
+            "only-1",
+            "Only Here",
+            ("Ada",),
+            album_images=(
+                SpotifyImage("https://i.scdn.co/image/small", 64, 64),
+                SpotifyImage("https://i.scdn.co/image/wide", 640, 640),
+            ),
+        )
+    ]
+
+    imported = _import(client, user_id, "spotify-pl")
+
+    assert imported.status_code == 201
+    song = imported.json()["playlist"]["songs"][0]
+    assert song["image_url"] == "https://i.scdn.co/image/wide"
+    assert _song_image(song["song_id"]) == ("https://i.scdn.co/image/wide", "spotify")
+
+
+def test_http_library_keeps_the_widest_playlist_and_album_image() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "name": "Night",
+                "images": [
+                    {"url": "https://i.scdn.co/image/small-list", "width": 64, "height": 64},
+                    {"url": "https://i.scdn.co/image/wide-list", "width": 640, "height": 640},
+                ],
+                "tracks": {
+                    "items": [
+                        {
+                            "track": {
+                                "id": "t1",
+                                "name": "First",
+                                "artists": [{"name": "A"}],
+                                "duration_ms": 1000,
+                                "album": {
+                                    "images": [
+                                        {"url": "https://i.scdn.co/image/small-album", "width": 64},
+                                        {"url": "https://i.scdn.co/image/wide-album", "width": 640},
+                                    ]
+                                },
+                            }
+                        }
+                    ],
+                    "next": None,
+                },
+            },
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        name, items, image_url = HttpxSpotifyLibrary(http).playlist("token-1", "pl-1")
+
+    assert name == "Night"
+    assert image_url == "https://i.scdn.co/image/wide-list"
+    assert items[0].album_images == (
+        SpotifyImage("https://i.scdn.co/image/small-album", None, 64),
+        SpotifyImage("https://i.scdn.co/image/wide-album", None, 640),
+    )
 
 
 def test_http_library_rejects_a_playlist_without_songs() -> None:
@@ -469,8 +570,37 @@ def item(
     *,
     isrc: str | None = None,
     duration_ms: int | None = 1000,
+    album_images: tuple[SpotifyImage, ...] = (),
 ) -> SpotifyItem:
-    return SpotifyItem(spotify_id, title, artists, isrc, duration_ms, True)
+    return SpotifyItem(spotify_id, title, artists, isrc, duration_ms, True, album_images)
+
+
+def _playlist_image(playlist_id: int) -> tuple[str | None, str | None]:
+    connection = open_database()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT image_url, image_source FROM playlists WHERE id = %s",
+                (playlist_id,),
+            )
+            row = cursor.fetchone()
+    finally:
+        connection.close()
+    return row["image_url"], row["image_source"]
+
+
+def _song_image(song_id: int) -> tuple[str | None, str | None]:
+    connection = open_database()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT image_url, image_source FROM songs WHERE id = %s",
+                (song_id,),
+            )
+            row = cursor.fetchone()
+    finally:
+        connection.close()
+    return row["image_url"], row["image_source"]
 
 
 def _import(client: TestClient, user_id: int, playlist_id: str):

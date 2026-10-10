@@ -28,6 +28,7 @@ interface SongFields {
   mbid: string | null
   isrc: string | null
   disambiguation: string | null
+  image_url: string | null
   sources: Source[]
 }
 

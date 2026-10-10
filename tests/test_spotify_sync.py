@@ -21,14 +21,15 @@ class FakeLibrary:
     def __init__(self) -> None:
         self.name = "Night Drive"
         self.items: list[SpotifyItem] = []
+        self.image_url: str | None = None
         self.error: Exception | None = None
         self.calls: list[tuple[str, str]] = []
 
-    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem]]:
+    def playlist(self, access_token: str, playlist_id: str) -> tuple[str, list[SpotifyItem], str | None]:
         self.calls.append((access_token, playlist_id))
         if self.error is not None:
             raise self.error
-        return self.name, list(self.items)
+        return self.name, list(self.items), self.image_url
 
 
 class FakePublisher:

@@ -1,7 +1,12 @@
-"""Spotify token endpoint. PKCE, no client secret."""
+"""Spotify token endpoint.
+
+User connect and refresh stay PKCE, with no client secret. Album art uses a
+separate client-credentials app token, cached until it expires.
+"""
 
 from __future__ import annotations
 
+import time
 from typing import Protocol
 
 import httpx
@@ -32,6 +37,7 @@ class HttpxSpotifyTokenClient:
     def __init__(self, client: httpx.Client | None = None) -> None:
         self._client = client if client is not None else httpx.Client(timeout=30.0)
         self._owns_client = client is None
+        self._app_token: tuple[tuple[str, str], str, float] | None = None
 
     def close(self) -> None:
         if self._owns_client:
@@ -63,6 +69,34 @@ class HttpxSpotifyTokenClient:
                 "client_id": client_id,
             }
         )
+
+    def client_credentials(self, *, client_id: str, client_secret: str) -> dict:
+        return self._post(
+            {
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }
+        )
+
+    def app_access_token(self, *, client_id: str, client_secret: str) -> str:
+        """Client-credentials token, reused until shortly before it expires."""
+        now = time.monotonic()
+        cached = self._app_token
+        key = (client_id, client_secret)
+        if cached is not None and cached[0] == key and now < cached[2]:
+            return cached[1]
+        payload = self.client_credentials(client_id=client_id, client_secret=client_secret)
+        token = payload.get("access_token")
+        if not isinstance(token, str) or not token:
+            raise SpotifyTokenError("Spotify token response had no access_token")
+        expires_in = payload.get("expires_in")
+        if isinstance(expires_in, bool) or not isinstance(expires_in, int):
+            seconds = 3600
+        else:
+            seconds = expires_in
+        self._app_token = (key, token, now + max(seconds - 30, 0))
+        return token
 
     def _post(self, data: dict[str, str]) -> dict:
         try:

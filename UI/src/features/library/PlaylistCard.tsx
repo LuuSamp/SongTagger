@@ -20,17 +20,21 @@ export function PlaylistCard({ playlist, selected }: PlaylistCardProps) {
       className={styles.card}
       aria-current={selected ? 'page' : undefined}
     >
-      <span className={styles.mosaic} aria-hidden="true">
-        {covers.length > 0
-          ? covers.map((song) => (
-              <SongArtwork
-                key={song.membership_id}
-                song={playlistSongSummary(song)}
-                variant="tile"
-              />
-            ))
-          : null}
-      </span>
+      {playlist.image_url ? (
+        <img className={styles.cover} src={playlist.image_url} alt="" />
+      ) : (
+        <span className={styles.mosaic} aria-hidden="true">
+          {covers.length > 0
+            ? covers.map((song) => (
+                <SongArtwork
+                  key={song.membership_id}
+                  song={playlistSongSummary(song)}
+                  variant="tile"
+                />
+              ))
+            : null}
+        </span>
+      )}
       <span className={styles.name}>{playlist.name}</span>
       <span className={styles.meta}>
         {count} {count === 1 ? 'song' : 'songs'}

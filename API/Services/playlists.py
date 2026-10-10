@@ -39,7 +39,7 @@ class PlaylistService:
             self._require_owner(connection, user_id)
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT id, name, created_at, spotify_playlist_id "
+                    "SELECT id, name, created_at, spotify_playlist_id, image_url "
                     "FROM playlists WHERE user_id = %s ORDER BY id",
                     (user_id,),
                 )
@@ -166,7 +166,7 @@ class PlaylistService:
     def _require_playlist(self, connection, user_id: int, playlist_id: int) -> dict:
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT id, user_id, name, created_at, spotify_playlist_id "
+                "SELECT id, user_id, name, created_at, spotify_playlist_id, image_url "
                 "FROM playlists WHERE id = %s AND user_id = %s",
                 (playlist_id, user_id),
             )
@@ -187,7 +187,8 @@ class PlaylistService:
         playlist = self._require_playlist(connection, user_id, playlist_id)
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT ps.id AS membership_id, ps.position, ps.song_id, s.title, s.artist_credit "
+                "SELECT ps.id AS membership_id, ps.position, ps.song_id, s.title, "
+                "s.artist_credit, s.image_url "
                 "FROM playlist_songs ps "
                 "JOIN songs s ON s.id = ps.song_id "
                 "WHERE ps.playlist_id = %s "
@@ -201,6 +202,7 @@ class PlaylistService:
                     "song_id": int(row["song_id"]),
                     "title": row["title"],
                     "artist_credit": row["artist_credit"],
+                    "image_url": row["image_url"],
                 }
                 for row in cursor.fetchall()
             ]
@@ -224,6 +226,7 @@ def _summary(row: dict) -> dict:
         "name": row["name"],
         "created_at": row["created_at"],
         "spotify_playlist_id": row["spotify_playlist_id"],
+        "image_url": row["image_url"],
     }
 
 

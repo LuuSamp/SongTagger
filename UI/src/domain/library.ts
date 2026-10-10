@@ -5,6 +5,7 @@ export interface SongSummary {
   title: string
   artist_credit: string
   tags: Tag[]
+  image_url?: string | null
 }
 
 export interface LibraryUser {
@@ -16,6 +17,7 @@ export interface PlaylistSummary {
   id: number
   name: string
   created_at: string
+  image_url: string | null
   spotify_playlist_id?: string | null
 }
 
@@ -25,6 +27,7 @@ export interface PlaylistSong {
   song_id: number
   title: string
   artist_credit: string
+  image_url: string | null
 }
 
 export interface Playlist extends PlaylistSummary {
@@ -98,7 +101,13 @@ export function favoriteSongSummary(song: FavoriteSong): SongSummary {
 }
 
 export function playlistSongSummary(song: PlaylistSong): SongSummary {
-  return { id: song.song_id, title: song.title, artist_credit: song.artist_credit, tags: [] }
+  return {
+    id: song.song_id,
+    title: song.title,
+    artist_credit: song.artist_credit,
+    tags: [],
+    image_url: song.image_url,
+  }
 }
 
 export function containsSong(playlist: Playlist, songId: number): boolean {
