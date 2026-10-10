@@ -1,0 +1,16 @@
+.canvas {
+  position: absolute;
+  top: -40px;
+  left: -64px;
+  z-index: 0;
+  width: calc(100% + 128px);
+  height: calc(100% + 130px);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .canvas {
+    left: 0;
+    width: 100%;
+  }
+}

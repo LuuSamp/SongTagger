@@ -6,6 +6,7 @@ import type { ShowcaseSong } from '../../config/showcase'
 import { TAG_KIND_COLORS } from '../../domain/tags'
 import { SongArtwork } from '../songs/SongArtwork'
 import styles from './HangingTags.module.css'
+import { WindLayer } from './WindLayer'
 
 const HANG = [
   { drop: 18, tilt: -2.5, delay: 0, anchor: 8 },
@@ -24,6 +25,7 @@ export function HangingTags({ songs }: HangingTagsProps) {
         Every song wears the tags its listeners give it.
       </figcaption>
       <div className={styles.stage}>
+        <WindLayer />
         <svg
           className={styles.string}
           viewBox="0 0 600 40"
