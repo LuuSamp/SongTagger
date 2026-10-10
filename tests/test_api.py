@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from db.manager import open_database
+
 from tests.conftest import FakeSource, add_tag, count_rows, insert_song, insert_user, tag_rows
 
 
@@ -207,3 +209,180 @@ def test_catalog_unknown_user_and_empty_query(client) -> None:
     assert not_integer.status_code == 422
     detail = not_integer.json()["detail"]
     assert isinstance(detail, str)
+
+
+def test_lookup_user_returns_id(client) -> None:
+    user_id = insert_user("ada")
+    found = client.get("/users/ada")
+    assert found.status_code == 200
+    assert found.json() == {"id": user_id, "username": "ada"}
+
+    catalog = client.get("/users/catalog")
+    assert catalog.status_code == 400
+    assert isinstance(catalog.json()["detail"], str)
+
+    missing = client.get("/users/nobody")
+    assert missing.status_code == 404
+    assert isinstance(missing.json()["detail"], str)
+
+
+def test_create_playlist_returns_empty(client) -> None:
+    user_id = insert_user("ada")
+    created = client.post(f"/user/{user_id}/playlist", json={"name": "  Night Drive  "})
+    assert created.status_code == 201
+    body = created.json()
+    assert body["name"] == "Night Drive"
+    assert body["songs"] == []
+    assert isinstance(body["id"], int)
+    assert isinstance(body["created_at"], str)
+
+
+def test_list_playlists_is_only_that_user(client) -> None:
+    ada = insert_user("ada")
+    grace = insert_user("grace")
+    first = client.post(f"/user/{ada}/playlist", json={"name": "Early"})
+    second = client.post(f"/user/{ada}/playlist", json={"name": "Late"})
+    client.post(f"/user/{grace}/playlist", json={"name": "Grace"})
+
+    listed = client.get(f"/user/{ada}/playlist")
+    assert listed.status_code == 200
+    playlists = listed.json()["playlists"]
+    assert [item["name"] for item in playlists] == ["Early", "Late"]
+    assert [item["id"] for item in playlists] == [first.json()["id"], second.json()["id"]]
+    assert "songs" not in playlists[0]
+    assert isinstance(playlists[0]["created_at"], str)
+
+
+def test_playlist_insert_append_duplicate_and_gap(client) -> None:
+    user_id = insert_user("ada")
+    first = insert_song("Yesterday", "The Beatles")
+    second = insert_song("Hey Jude", "The Beatles")
+    playlist_id = client.post(f"/user/{user_id}/playlist", json={"name": "Set"}).json()["id"]
+    base = f"/user/{user_id}/playlist/{playlist_id}"
+
+    appended = client.post(f"{base}/song", json={"song_id": first})
+    assert appended.status_code == 200
+    assert appended.json()["songs"][0]["position"] == 1
+    assert appended.json()["songs"][0]["song_id"] == first
+    assert appended.json()["songs"][0]["title"] == "Yesterday"
+    assert appended.json()["songs"][0]["artist_credit"] == "The Beatles"
+    again = client.post(f"{base}/song", json={"song_id": first})
+    inserted = client.post(f"{base}/song", json={"song_id": second, "position": 1})
+    songs = inserted.json()["songs"]
+    assert [song["song_id"] for song in songs] == [second, first, first]
+    assert [song["position"] for song in songs] == [1, 2, 3]
+    assert len({song["membership_id"] for song in songs}) == 3
+    assert again.json()["songs"][1]["membership_id"] != appended.json()["songs"][0]["membership_id"]
+
+    removed = client.delete(f"{base}/song/{songs[1]['membership_id']}")
+    assert removed.status_code == 204
+    assert removed.content == b""
+    left = client.get(base)
+    assert left.status_code == 200
+    assert [(song["song_id"], song["position"]) for song in left.json()["songs"]] == [
+        (second, 1),
+        (first, 2),
+    ]
+
+
+def test_reorder_rewrites_positions_and_rename_keeps_them(client) -> None:
+    user_id = insert_user("ada")
+    first = insert_song("Yesterday", "The Beatles")
+    second = insert_song("Hey Jude", "The Beatles")
+    playlist_id = client.post(f"/user/{user_id}/playlist", json={"name": "Set"}).json()["id"]
+    base = f"/user/{user_id}/playlist/{playlist_id}"
+    client.post(f"{base}/song", json={"song_id": first})
+    client.post(f"{base}/song", json={"song_id": second})
+    before = client.get(base).json()["songs"]
+    ids = [song["membership_id"] for song in before]
+
+    reordered = client.put(f"{base}/order", json={"membership_ids": [ids[1], ids[0]]})
+    assert reordered.status_code == 200
+    assert [(song["membership_id"], song["position"]) for song in reordered.json()["songs"]] == [
+        (ids[1], 1),
+        (ids[0], 2),
+    ]
+
+    renamed = client.patch(base, json={"name": "  Later  "})
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Later"
+    assert [(song["membership_id"], song["position"]) for song in renamed.json()["songs"]] == [
+        (ids[1], 1),
+        (ids[0], 2),
+    ]
+
+
+def test_delete_playlist_removes_memberships_and_keeps_the_song(client) -> None:
+    user_id = insert_user("ada")
+    song_id = insert_song("Yesterday", "The Beatles")
+    songs_before = count_rows("songs")
+    playlist_id = client.post(f"/user/{user_id}/playlist", json={"name": "Set"}).json()["id"]
+    base = f"/user/{user_id}/playlist/{playlist_id}"
+    client.post(f"{base}/song", json={"song_id": song_id})
+
+    deleted = client.delete(base)
+    assert deleted.status_code == 204
+    assert deleted.content == b""
+    assert client.get(base).status_code == 404
+    assert count_rows("songs") == songs_before
+    assert count_rows("playlists") == 0
+    assert count_rows("playlist_songs") == 0
+
+
+def test_playlist_bad_requests(client) -> None:
+    user_id = insert_user("ada")
+    song_id = insert_song("Yesterday", "The Beatles")
+    catalog_id = _catalog_user_id()
+    playlist_id = client.post(f"/user/{user_id}/playlist", json={"name": "Set"}).json()["id"]
+    base = f"/user/{user_id}/playlist/{playlist_id}"
+    added = client.post(f"{base}/song", json={"song_id": song_id})
+    membership_id = added.json()["songs"][0]["membership_id"]
+
+    empty = client.post(f"/user/{user_id}/playlist", json={"name": "   "})
+    too_long = client.post(f"/user/{user_id}/playlist", json={"name": "a" * 256})
+    catalog = client.post(f"/user/{catalog_id}/playlist", json={"name": "Catalog"})
+    low = client.post(f"{base}/song", json={"song_id": song_id, "position": 0})
+    high = client.post(f"{base}/song", json={"song_id": song_id, "position": 3})
+    duplicate = client.put(f"{base}/order", json={"membership_ids": [membership_id, membership_id]})
+    extra = client.put(f"{base}/order", json={"membership_ids": [membership_id, membership_id + 1]})
+    for response in (empty, too_long, catalog, low, high, duplicate, extra):
+        assert response.status_code == 400
+        assert isinstance(response.json()["detail"], str)
+
+    accepted = client.post(f"/user/{user_id}/playlist", json={"name": "a" * 255})
+    assert accepted.status_code == 201
+    assert accepted.json()["name"] == "a" * 255
+
+
+def test_playlist_not_found(client) -> None:
+    ada = insert_user("ada")
+    grace = insert_user("grace")
+    song_id = insert_song("Yesterday", "The Beatles")
+    ada_id = client.post(f"/user/{ada}/playlist", json={"name": "Ada"}).json()["id"]
+    grace_id = client.post(f"/user/{grace}/playlist", json={"name": "Grace"}).json()["id"]
+    added = client.post(f"/user/{ada}/playlist/{ada_id}/song", json={"song_id": song_id})
+    membership_id = added.json()["songs"][0]["membership_id"]
+
+    missing_user = client.get("/user/999999/playlist")
+    other = client.get(f"/user/{grace}/playlist/{ada_id}")
+    unknown_song = client.post(
+        f"/user/{ada}/playlist/{ada_id}/song",
+        json={"song_id": 999999},
+    )
+    other_membership = client.delete(f"/user/{grace}/playlist/{grace_id}/song/{membership_id}")
+    for response in (missing_user, other, unknown_song, other_membership):
+        assert response.status_code == 404
+        assert isinstance(response.json()["detail"], str)
+
+    still_there = client.get(f"/user/{ada}/playlist/{ada_id}")
+    assert [song["membership_id"] for song in still_there.json()["songs"]] == [membership_id]
+
+
+def _catalog_user_id() -> int:
+    connection = open_database()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE username = %s", ("catalog",))
+            return int(cursor.fetchone()["id"])
+    finally:
+        connection.close()

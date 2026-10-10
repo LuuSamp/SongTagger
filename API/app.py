@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from API.Adapters.musicbrainz import MusicBrainzAdapter, RecordingSource
 from API.Controllers.routes import build_router
 from API.Services.errors import APIError
+from API.Services.playlists import PlaylistService
 from API.Services.search import SearchService
 from API.Services.songs import SongService
 from API.Services.tags import TagService
@@ -32,7 +33,14 @@ def create_app(source: RecordingSource | None = None) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     app.state.source = recording_source
     songs = SongService()
-    app.include_router(build_router(SearchService(recording_source, songs), songs, TagService(songs)))
+    app.include_router(
+        build_router(
+            SearchService(recording_source, songs),
+            songs,
+            TagService(songs),
+            PlaylistService(songs),
+        )
+    )
     app.add_exception_handler(APIError, _api_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     return app

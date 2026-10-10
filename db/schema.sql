@@ -77,3 +77,27 @@ CREATE TABLE IF NOT EXISTS user_songs (
     CONSTRAINT user_songs_user_fk FOREIGN KEY (user_id) REFERENCES users (id),
     CONSTRAINT user_songs_song_fk FOREIGN KEY (song_id) REFERENCES songs (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One playlist belongs to one user. Song order lives on playlist_songs.
+-- The same song may appear more than once. Positions are always 1..n.
+
+CREATE TABLE IF NOT EXISTS playlists (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY playlists_user (user_id),
+    CONSTRAINT playlists_user_fk FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS playlist_songs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    playlist_id BIGINT UNSIGNED NOT NULL,
+    song_id BIGINT UNSIGNED NOT NULL,
+    position INT UNSIGNED NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY playlist_songs_position (playlist_id, position),
+    CONSTRAINT playlist_songs_playlist_fk FOREIGN KEY (playlist_id) REFERENCES playlists (id),
+    CONSTRAINT playlist_songs_song_fk FOREIGN KEY (song_id) REFERENCES songs (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

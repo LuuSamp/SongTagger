@@ -16,6 +16,14 @@ def tag_token(name: str) -> str:
 
 
 class SongService:
+    def lookup(self, username: str) -> dict:
+        connection = open_database()
+        try:
+            user_id = self.require_user(connection, username)
+        finally:
+            connection.close()
+        return {"id": user_id, "username": username}
+
     def get(self, username: str, song_id: int) -> dict:
         connection = open_database()
         try:
