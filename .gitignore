@@ -1,5 +1,5 @@
 db/seed_cache.json
-
+.cursor
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,node,react
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,visualstudiocode,node,react
