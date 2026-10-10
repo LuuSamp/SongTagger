@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import pymysql
 
-from db.manager import CATALOG_USERNAME, open_database
+from db.manager import CATALOG_USERNAME, load_project_env, open_database
 
 ROOT = Path(__file__).resolve().parent
 QUERIES_PATH = ROOT / "seed_queries.txt"
@@ -501,6 +501,7 @@ def seed(connection) -> tuple[int, list[str]]:
 
 
 def main() -> None:
+    load_project_env()
     connection = open_database()
     try:
         stored, misses = seed(connection)

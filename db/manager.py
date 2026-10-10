@@ -1,6 +1,7 @@
 """Open the catalog database and create its tables.
 
-Connection settings come from the environment:
+``python -m db.manager`` loads SongTagger/.env first, same as ``python -m API``.
+A name in that file wins over the process environment. Connection settings:
 
 - SONGTAGGING_DB_HOST (default 127.0.0.1)
 - SONGTAGGING_DB_PORT (default 3306)
@@ -19,11 +20,19 @@ import pymysql
 from pymysql.connections import Connection
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 
 SOURCE_NAMES = ("musicbrainz", "spotify", "apple_music", "youtube", "discogs")
 CATALOG_USERNAME = "catalog"
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def load_project_env() -> None:
+    """Load SongTagger/.env. A missing file leaves the process environment as it is."""
+    from API.env import load_env
+
+    load_env(ENV_PATH)
 
 
 def database_settings() -> dict[str, str | int]:
@@ -121,6 +130,7 @@ def ensure_catalog_rows(connection: Connection) -> None:
 
 
 def main() -> None:
+    load_project_env()
     settings = database_settings()
     server = open_connection(database=None)
     try:

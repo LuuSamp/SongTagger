@@ -3,7 +3,7 @@ from __future__ import annotations
 from API.Services.playlists import PlaylistService
 from API.Services.songs import SongService
 from API.Services.tags import TagService
-from db.manager import open_database
+from db.manager import load_project_env, open_database
 from db.seed import fold
 
 DEMO_USERS = ("ada", "bia")
@@ -118,6 +118,7 @@ def find_song(index: list[tuple[int, str, str]], artist: str, title: str) -> int
 
 
 def main() -> None:
+    load_project_env()
     songs = SongService()
     tags = TagService(songs)
     playlists = PlaylistService(songs)

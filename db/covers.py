@@ -319,8 +319,9 @@ def _song_image_url(connection, song_id: int) -> str | None:
 
 
 def main() -> None:
-    from db.manager import open_database
+    from db.manager import load_project_env, open_database
 
+    load_project_env()
     connection = open_database()
     try:
         songs, playlists = fill_missing_images(connection)
