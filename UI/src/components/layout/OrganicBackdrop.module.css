@@ -1,0 +1,41 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(30vw, 380px);
+  height: 100%;
+  max-height: 1100px;
+}
+
+.left {
+  position: absolute;
+  top: 120px;
+  left: 0;
+  width: min(8vw, 110px);
+  height: 420px;
+}
+
+.sun {
+  position: absolute;
+  top: var(--space-6);
+  right: max(var(--layout-gutter), calc((100vw - var(--layout-max)) / 2 - 40px));
+  width: 110px;
+  height: 110px;
+}
+
+@media (max-width: 960px) {
+  .left,
+  .sun {
+    display: none;
+  }
+
+  .right {
+    opacity: 0.6;
+  }
+}

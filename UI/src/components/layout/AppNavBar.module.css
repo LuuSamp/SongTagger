@@ -1,0 +1,111 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--color-line);
+  background: rgb(244 239 230 / 94%);
+  backdrop-filter: blur(10px);
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 340px) 1fr auto;
+  grid-template-areas: 'brand search nav avatar';
+  align-items: center;
+  column-gap: var(--space-6);
+  max-width: var(--layout-max);
+  min-height: var(--header-height);
+  margin: 0 auto;
+  padding: 0 var(--layout-gutter);
+}
+
+.brand {
+  grid-area: brand;
+}
+
+.search {
+  grid-area: search;
+}
+
+.nav {
+  grid-area: nav;
+  display: flex;
+  align-self: stretch;
+  justify-content: center;
+  gap: var(--space-6);
+}
+
+.link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color var(--motion-fast);
+}
+
+.link:hover {
+  color: var(--color-ink);
+}
+
+.link:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.active {
+  color: var(--color-ink);
+}
+
+.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--color-ink-muted);
+}
+
+.avatar {
+  grid-area: avatar;
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-ink-inverse);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .inner {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'brand nav avatar'
+      'search search search';
+    column-gap: var(--space-3);
+  }
+
+  .search {
+    padding-bottom: var(--space-3);
+  }
+
+  .nav {
+    gap: var(--space-4);
+    min-height: 60px;
+  }
+
+  .link {
+    font-size: var(--text-xs);
+  }
+}

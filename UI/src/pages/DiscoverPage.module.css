@@ -1,0 +1,25 @@
+.intro {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  text-transform: uppercase;
+}
+
+.subtitle {
+  max-width: 60ch;
+  color: var(--color-ink-muted);
+}
+
+.content {
+  display: grid;
+  gap: var(--space-7);
+}
+
+.forYou {
+  display: grid;
+  gap: var(--space-7);
+}

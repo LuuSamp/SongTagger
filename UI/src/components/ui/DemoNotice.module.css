@@ -1,0 +1,13 @@
+.notice {
+  padding: var(--space-2) var(--layout-gutter);
+  background: var(--color-ink);
+  color: var(--color-ink-inverse);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.notice strong {
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}

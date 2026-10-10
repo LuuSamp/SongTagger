@@ -1,0 +1,46 @@
+.artwork {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 30% 25%, var(--art-glow), transparent 60%),
+    linear-gradient(160deg, var(--art-base), color-mix(in srgb, var(--art-base) 70%, #000 30%));
+  color: var(--art-ink);
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.card {
+  border-radius: var(--radius-md);
+}
+
+.thumb {
+  width: 56px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+}
+
+.hero {
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lifted);
+}
+
+.overlay {
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  background: linear-gradient(to top, rgb(20 14 10 / 70%), transparent);
+  color: #fffaf3;
+}
+
+.tile {
+  width: 100%;
+  border-radius: 0;
+}

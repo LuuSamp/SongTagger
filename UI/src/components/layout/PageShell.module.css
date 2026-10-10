@@ -1,0 +1,32 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  overflow-x: clip;
+}
+
+.main {
+  position: relative;
+  max-width: var(--layout-max);
+  margin: 0 auto;
+  padding: var(--space-7) var(--layout-gutter) var(--space-8);
+}
+
+.footer {
+  padding: var(--space-5) var(--layout-gutter);
+  border-top: 1px solid var(--color-line);
+  color: var(--color-ink-subtle);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding-top: var(--space-5);
+  }
+}

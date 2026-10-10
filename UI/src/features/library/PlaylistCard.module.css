@@ -1,0 +1,44 @@
+.card {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition:
+    background-color var(--motion-fast),
+    border-color var(--motion-fast);
+}
+
+.card:hover {
+  background: var(--color-surface);
+}
+
+.card[aria-current='page'] {
+  border-color: var(--color-ink);
+  background: var(--color-surface);
+}
+
+.mosaic {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  aspect-ratio: 1;
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(circle at 35% 35%, var(--color-sand), transparent 60%), var(--color-line);
+}
+
+.mosaic:has(> :only-child) {
+  grid-template-columns: 1fr;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.meta {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+}

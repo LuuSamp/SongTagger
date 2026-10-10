@@ -1,0 +1,62 @@
+:root {
+  --color-canvas: #f4efe6;
+  --color-surface: #fbf8f2;
+  --color-surface-raised: #ffffff;
+  --color-ink: #2b2622;
+  --color-ink-muted: #6f645b;
+  --color-ink-subtle: #9a8e83;
+  --color-ink-inverse: #fbf8f2;
+  --color-line: #e3d9cc;
+  --color-line-strong: #cbbdac;
+
+  --color-accent: #c46a4e;
+  --color-accent-strong: #a9543b;
+  --color-accent-soft: #f2dccf;
+  --color-sand: #e9c9a3;
+  --color-sun: #f0c27b;
+  --color-sage: #7f9273;
+  --color-sage-soft: #e3e9dc;
+
+  --color-danger: #b4432f;
+  --color-danger-soft: #f6dfd9;
+
+  --font-display: 'Archivo', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: clamp(2.25rem, 4vw + 1rem, 3.5rem);
+
+  --tracking-label: 0.08em;
+  --tracking-display: 0.01em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 1px 2px rgb(43 38 34 / 6%), 0 8px 24px rgb(43 38 34 / 8%);
+  --shadow-lifted: 0 2px 4px rgb(43 38 34 / 8%), 0 18px 40px rgb(43 38 34 / 14%);
+
+  --focus-ring: 0 0 0 3px rgb(196 106 78 / 35%);
+
+  --motion-fast: 120ms ease-out;
+  --motion-base: 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --layout-max: 1200px;
+  --layout-gutter: clamp(1rem, 4vw, 2.5rem);
+  --header-height: 68px;
+}
