@@ -82,6 +82,7 @@ class PlaylistSummary(BaseModel):
     id: int
     name: str
     created_at: datetime
+    spotify_playlist_id: str | None
 
 
 class Playlist(PlaylistSummary):
