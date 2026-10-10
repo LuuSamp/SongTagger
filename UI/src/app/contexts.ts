@@ -1,5 +1,10 @@
 import { createContext, useContext } from 'react'
-import type { Playlist } from '../domain/library'
+import type {
+  Playlist,
+  SpotifyExportResult,
+  SpotifyImportResult,
+  SpotifyPlaylistList,
+} from '../domain/library'
 import type { CatalogService } from '../services/catalog'
 import type { LibrarySourceKind } from '../services/library'
 import type { FavoritesState } from './useFavoritesState'
@@ -31,6 +36,10 @@ export interface LibraryActions extends FavoritesState {
   moveSong: (playlistId: number, membershipId: number, offset: -1 | 1) => Promise<boolean>
   reorderSongs: (playlistId: number, membershipIds: readonly number[]) => Promise<boolean>
   playlistsContaining: (songId: number) => Playlist[]
+  spotifyConnectUrl: () => Promise<string>
+  listSpotifyPlaylists: () => Promise<SpotifyPlaylistList>
+  importFromSpotify: (spotifyPlaylistId: string) => Promise<SpotifyImportResult>
+  exportToSpotify: (playlistId: number) => Promise<SpotifyExportResult>
 }
 
 export const LibraryContext = createContext<LibraryActions | null>(null)

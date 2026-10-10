@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { groupTagsByKind, normalizeTagName, parseTokens, toToken } from './tags'
-import type { Tag } from './types'
+import { groupTagsByKind, normalizeTagName, parseTokens, toToken, visibleTags } from './tags'
+import type { Tag, UserTag } from './types'
 
 describe('tag normalization', () => {
   it('folds accents, case and hyphens like the API', () => {
@@ -21,5 +21,23 @@ describe('tag normalization', () => {
       { kind: 'genre', name: 'MPB', token: 'mpb' },
     ]
     expect(groupTagsByKind(tags).map(([kind]) => kind)).toEqual(['artist', 'genre', 'feeling'])
+  })
+})
+
+describe('visibleTags', () => {
+  const tags: UserTag[] = [
+    { kind: 'artist', name: 'Jobim', token: 'jobim', applied_by_me: false },
+    { kind: 'genre', name: 'Bossa Nova', token: 'bossa-nova', applied_by_me: false },
+    { kind: 'genre', name: 'Jazz', token: 'jazz', applied_by_me: false },
+    { kind: 'genre', name: 'Latin', token: 'latin', applied_by_me: false },
+    { kind: 'feeling', name: 'Sunny', token: 'sunny', applied_by_me: true },
+  ]
+
+  it('returns everything when under the limit', () => {
+    expect(visibleTags(tags, 8)).toHaveLength(5)
+  })
+
+  it('keeps the caller tags visible and preserves kind order', () => {
+    expect(visibleTags(tags, 3).map((tag) => tag.token)).toEqual(['jobim', 'bossa-nova', 'sunny'])
   })
 })

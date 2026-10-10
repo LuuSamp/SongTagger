@@ -281,6 +281,51 @@ def test_unknown_user_and_missing_settings_and_bad_callback(database, monkeypatc
     assert _spotify_row(user_id) is None
 
 
+def test_callback_redirects_to_the_ui_when_configured(database, monkeypatch) -> None:
+    _spotify_env(monkeypatch)
+    monkeypatch.setenv("SPOTIFY_UI_REDIRECT", "http://127.0.0.1:5173/library")
+    user_id = insert_user("ada")
+    with TestClient(create_app(FakeSource(), FakeTokenClient())) as client:
+        state, _verifier = _start(client, user_id)
+        response = client.get(
+            "/auth/spotify/callback",
+            params={"code": "code-1", "state": state},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "http://127.0.0.1:5173/library?spotify=connected"
+    assert _spotify_row(user_id) is not None
+
+
+def test_failed_callback_redirects_with_error_and_keeps_query(database, monkeypatch) -> None:
+    _spotify_env(monkeypatch)
+    monkeypatch.setenv("SPOTIFY_UI_REDIRECT", "http://127.0.0.1:5173/library?tab=playlists")
+    user_id = insert_user("ada")
+    fake = FakeTokenClient()
+    with TestClient(create_app(FakeSource(), fake)) as client:
+        state, _verifier = _start(client, user_id)
+        denied = client.get(
+            "/auth/spotify/callback",
+            params={"error": "access_denied", "state": state},
+            follow_redirects=False,
+        )
+        fake.exchange_error = SpotifyTokenError("HTTP 503")
+        state, _verifier = _start(client, user_id)
+        failed = client.get(
+            "/auth/spotify/callback",
+            params={"code": "code-1", "state": state},
+            follow_redirects=False,
+        )
+
+    expected = "http://127.0.0.1:5173/library?tab=playlists&spotify=error"
+    assert denied.status_code == 302
+    assert denied.headers["location"] == expected
+    assert failed.status_code == 302
+    assert failed.headers["location"] == expected
+    assert _spotify_row(user_id) is None
+
+
 def test_access_token_rejects_unknown_and_catalog_users(database, monkeypatch) -> None:
     _spotify_env(monkeypatch)
     with TestClient(create_app(FakeSource(), FakeTokenClient())) as client:
@@ -347,6 +392,7 @@ def test_httpx_token_client_raises_when_spotify_rejects() -> None:
 def _spotify_env(monkeypatch) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "client-id")
     monkeypatch.setenv("SPOTIFY_REDIRECT_URI", REDIRECT)
+    monkeypatch.delenv("SPOTIFY_UI_REDIRECT", raising=False)
 
 
 def _start(client: TestClient, user_id: int) -> tuple[str, str]:

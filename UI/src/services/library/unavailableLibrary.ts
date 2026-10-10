@@ -19,5 +19,9 @@ export function createUnavailableLibrary(): LibraryService {
     listFavorites: unavailable,
     addFavorite: unavailable,
     removeFavorite: unavailable,
+    spotifyConnectUrl: unavailable,
+    listSpotifyPlaylists: unavailable,
+    importSpotifyPlaylist: unavailable,
+    exportToSpotify: unavailable,
   }
 }

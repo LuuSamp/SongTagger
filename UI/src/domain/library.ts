@@ -18,6 +18,7 @@ export interface PlaylistSummary {
   name: string
   created_at: string
   image_url: string | null
+  spotify_playlist_id?: string | null
 }
 
 export interface PlaylistSong {
@@ -46,6 +47,53 @@ export interface FavoriteSong {
 
 export interface FavoriteList {
   songs: FavoriteSong[]
+}
+
+export interface SpotifyImage {
+  url: string
+  height: number | null
+  width: number | null
+}
+
+export interface SpotifyPlaylistItem {
+  spotify_playlist_id: string
+  name: string
+  images: SpotifyImage[]
+}
+
+export interface SpotifyPlaylistList {
+  playlists: SpotifyPlaylistItem[]
+}
+
+export interface SpotifySkippedTrack {
+  spotify_id: string | null
+  title: string
+  artist_credit: string
+}
+
+export interface SpotifyImportResult {
+  playlist: Playlist
+  skipped: SpotifySkippedTrack[]
+}
+
+export interface SpotifySkippedSong {
+  song_id: number
+  title: string
+  artist_credit: string
+}
+
+export interface SpotifyExportResult {
+  spotify_playlist_id: string
+  url: string
+  skipped: SpotifySkippedSong[]
+}
+
+export function smallestCover(images: readonly SpotifyImage[], minSize = 64): string | null {
+  if (images.length === 0) {
+    return null
+  }
+  const sized = [...images].sort((a, b) => (a.width ?? Infinity) - (b.width ?? Infinity))
+  return (sized.find((image) => (image.width ?? Infinity) >= minSize) ?? sized.at(-1))?.url ?? null
 }
 
 export function favoriteSongSummary(song: FavoriteSong): SongSummary {

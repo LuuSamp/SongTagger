@@ -4,11 +4,24 @@ import type {
   LibraryUser,
   Playlist,
   PlaylistList,
+  SpotifyExportResult,
+  SpotifyImportResult,
+  SpotifyPlaylistList,
 } from '../../domain/library'
 import { ApiError, type HttpClient } from '../http/httpClient'
-import { FavoritesUnsupportedError, type LibraryService } from './LibraryService'
+import {
+  FavoritesUnsupportedError,
+  SpotifyNotConnectedError,
+  type LibraryService,
+} from './LibraryService'
 
-export function createHttpLibrary(http: HttpClient, username: string): LibraryService {
+const NOT_CONNECTED = 'Spotify is not connected'
+
+export function createHttpLibrary(
+  http: HttpClient,
+  username: string,
+  apiBaseUrl = '',
+): LibraryService {
   let userRequest: Promise<LibraryUser> | null = null
 
   function resolveUser(): Promise<LibraryUser> {
@@ -32,6 +45,17 @@ export function createHttpLibrary(http: HttpClient, username: string): LibrarySe
     } catch (error) {
       if (error instanceof ApiError && error.status === 404 && error.message === 'Not Found') {
         throw new FavoritesUnsupportedError()
+      }
+      throw error
+    }
+  }
+
+  async function spotify<T>(request: () => Promise<T>): Promise<T> {
+    try {
+      return await request()
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 400 && error.message === NOT_CONNECTED) {
+        throw new SpotifyNotConnectedError()
       }
       throw error
     }
@@ -81,6 +105,23 @@ export function createHttpLibrary(http: HttpClient, username: string): LibrarySe
     async removeFavorite(songId) {
       const path = await userPath(`/favorite/${songId}`)
       await favorites(() => http.delete(path))
+    },
+    async spotifyConnectUrl() {
+      return `${apiBaseUrl}${await userPath('/spotify/start')}`
+    },
+    async listSpotifyPlaylists() {
+      const path = await userPath('/spotify/playlists')
+      return spotify(() => http.get<SpotifyPlaylistList>(path))
+    },
+    async importSpotifyPlaylist(spotifyPlaylistId) {
+      const path = await playlistsPath('/spotify')
+      return spotify(() =>
+        http.post<SpotifyImportResult>(path, { spotify_playlist_id: spotifyPlaylistId }),
+      )
+    },
+    async exportToSpotify(playlistId) {
+      const path = await playlistsPath(`/${playlistId}/spotify`)
+      return spotify(() => http.post<SpotifyExportResult>(path, {}))
     },
   }
 }

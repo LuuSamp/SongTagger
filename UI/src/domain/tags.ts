@@ -7,6 +7,13 @@ export const TAG_KIND_LABELS: Record<TagKind, string> = {
   instrument: 'Instrument',
 }
 
+export const TAG_KIND_COLORS: Record<TagKind, string> = {
+  artist: 'var(--tag-artist)',
+  genre: 'var(--tag-genre)',
+  feeling: 'var(--tag-feeling)',
+  instrument: 'var(--tag-instrument)',
+}
+
 export function foldText(value: string): string {
   return value
     .normalize('NFKD')
@@ -70,4 +77,14 @@ export function sortTags<T extends Tag>(tags: readonly T[]): T[] {
 export function sharedTags<T extends Tag>(tags: readonly T[], others: readonly Tag[]): T[] {
   const tokens = new Set(others.map((tag) => tag.token))
   return tags.filter((tag) => tokens.has(tag.token))
+}
+
+export function visibleTags<T extends Tag>(tags: readonly T[], limit: number): T[] {
+  if (tags.length <= limit) {
+    return [...tags]
+  }
+  const mine = new Set(tags.filter(isAppliedByMe).slice(0, limit))
+  const others = tags.filter((tag) => !mine.has(tag)).slice(0, limit - mine.size)
+  const keep = new Set([...mine, ...others])
+  return tags.filter((tag) => keep.has(tag))
 }

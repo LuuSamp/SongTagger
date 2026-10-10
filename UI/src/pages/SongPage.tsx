@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { APP_PATHS, parseSongId } from '../app/routes'
 import { OrganicBackdrop } from '../components/layout/OrganicBackdrop'
@@ -7,15 +6,13 @@ import { Button, ButtonLink } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { StateMessage } from '../components/ui/StateMessage'
 import { catalogSources, formatDuration, listeningSources } from '../domain/songs'
-import type { TagKind, UserSong } from '../domain/types'
+import type { UserSong } from '../domain/types'
 import { AddToPlaylist } from '../features/library/AddToPlaylist'
 import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
 import { SongArtwork } from '../features/songs/SongArtwork'
 import { SourceLinks } from '../features/songs/SourceLinks'
-import { AddTagForm } from '../features/tags/AddTagForm'
-import { TagKindFilter, type TagKindSelection } from '../features/tags/TagKindFilter'
-import { TagList } from '../features/tags/TagList'
+import { SongTagsPanel } from '../features/tags/SongTagsPanel'
 import { useSong } from '../hooks/useSong'
 import { useTagMutations } from '../hooks/useTagMutations'
 import { ApiError } from '../services/http/httpClient'
@@ -83,15 +80,8 @@ interface SongDetailProps {
 }
 
 function SongDetail({ song, update, reload }: SongDetailProps) {
-  const [kindFilter, setKindFilter] = useState<TagKindSelection>('all')
   const tagging = useTagMutations({ songId: song.id, update, reload })
   const duration = formatDuration(song.duration_ms)
-  const presentKinds = useMemo(
-    () => [...new Set(song.tags.map((tag) => tag.kind))] as TagKind[],
-    [song.tags],
-  )
-  const visibleTags =
-    kindFilter === 'all' ? song.tags : song.tags.filter((tag) => tag.kind === kindFilter)
   const listenOn = listeningSources(song.sources)
   const catalogued = catalogSources(song.sources)
 
@@ -110,30 +100,9 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
           </div>
         </div>
 
-        <section className={styles.tags} aria-labelledby="tags-title">
-          <div className={styles.tagsHeader}>
-            <h2 id="tags-title" className={styles.sectionTitle}>
-              Tags
-            </h2>
-            {presentKinds.length > 1 ? (
-              <TagKindFilter kinds={presentKinds} value={kindFilter} onChange={setKindFilter} />
-            ) : null}
-          </div>
-          {song.tags.length === 0 ? (
-            <p className={styles.muted}>No tags yet. Be the first to describe this song.</p>
-          ) : (
-            <TagList
-              tags={visibleTags}
-              pendingKeys={tagging.pendingKeys}
-              onRemove={tagging.removeTag}
-            />
-          )}
-          <AddTagForm
-            onAdd={tagging.addTag}
-            error={tagging.error}
-            onDismissError={tagging.clearError}
-          />
-        </section>
+        <div className={styles.tags}>
+          <SongTagsPanel tags={song.tags} tagging={tagging} />
+        </div>
       </div>
 
       <div className={styles.secondary}>

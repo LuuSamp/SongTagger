@@ -1,12 +1,15 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import styles from './TagChip.module.css'
 
 type TagChipTone = 'outline' | 'mine' | 'onDark' | 'onLight'
+type TagChipSize = 'md' | 'sm'
 
 interface TagChipProps {
   label: ReactNode
   tone?: TagChipTone
+  size?: TagChipSize
+  marker?: string
   to?: string
   onClick?: () => void
   onRemove?: () => void
@@ -18,6 +21,8 @@ interface TagChipProps {
 export function TagChip({
   label,
   tone = 'outline',
+  size = 'md',
+  marker,
   to,
   onClick,
   onRemove,
@@ -25,10 +30,26 @@ export function TagChip({
   pending = false,
   title,
 }: TagChipProps) {
-  const className = [styles.chip, styles[tone], pending ? styles.pending : null]
+  const className = [
+    styles.chip,
+    styles[tone],
+    size === 'sm' ? styles.sm : null,
+    pending ? styles.pending : null,
+  ]
     .filter(Boolean)
     .join(' ')
-  const body = <span className={styles.label}>{label}</span>
+  const body = (
+    <span className={styles.label}>
+      {marker ? (
+        <span
+          className={styles.marker}
+          style={{ '--marker': marker } as CSSProperties}
+          aria-hidden="true"
+        />
+      ) : null}
+      {label}
+    </span>
+  )
 
   let main: ReactNode = body
   if (to) {

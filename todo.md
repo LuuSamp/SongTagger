@@ -97,7 +97,7 @@ Routing (`app/router.tsx`, URLs built by `app/routes.ts`):
 | Path | Page | Notes |
 |---|---|---|
 | `/` | `LandingPage` | Vibe panels and pitch, with `LandingHeader`. Legacy `/?tags=` and `/?title=` links redirect to `/discover`. |
-| `/discover` | `DiscoverPage` | `?tags=` / `?title=&artist=` search. With no query it shows the "For you" shelves. |
+| `/discover` | `DiscoverPage` | Search with `?tags=` or `?title=&artist=`. With no query it shows the "For you" shelves. The search is a tag composer (`features/discovery/SearchPanel.tsx`): "Tags · Title" underline tabs, then one large boxed field. The box has an accent border and ring on focus. A magnifier glyph inside it does a small "look around" motion every ~7s, pauses and turns accent while focused, and stays still under reduced motion. Clicking empty space in the box focuses the input. In Tags mode the active tags are removable chips inside the field; Enter or a comma adds tags, and Backspace on an empty input removes the last one. A "Try" / "Narrow it down" row suggests real vibe tokens. Title mode uses the same field with a "by artist" input. |
 | `/community` | `CommunityPage` | Placeholder ("Coming soon"). |
 | `/library` | `LibraryPage` | The default tab is Playlists. `?tab=favorites` shows the pending-feature notice, and `?playlist=<id>` selects a playlist. |
 | `/songs/:songId` | `SongPage` | A non-numeric id or an API 404 shows "not in the catalog". |
@@ -108,7 +108,10 @@ In-app pages use `AppNavBar`: the round logo, a search pill (tag search → `/di
 Reference mapping:
 - **Landing** follows image 2.
 - **The app bar** follows the third reference.
-- **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart works once the favorites API exists and shows a "coming soon" note until then. The playlist button carries a count badge and opens its panel right-aligned under the cover. The play button is not shown because playback is not implemented.
+- **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart works once the favorites API exists and shows a "coming soon" note until then. The playlist button carries a count badge and opens its panel right-aligned under the cover. The play button is not shown because playback is not implemented. The tags section (`features/tags/SongTagsPanel.tsx`) shows every category at once, grouped as Artist / Genre / Feeling / Instrument with a colour dot and a count:
+  - The header has the title, a count and a round + button that opens the add form.
+  - The chips are compact.
+  - Each category shows up to 5 tags and a "+N" toggle for the rest. The user's own tags always stay visible (`visibleTags` in `domain/tags.ts`).
 
 ## B. Data flow and integrations
 
@@ -263,5 +266,14 @@ The frontend is complete and switches on by itself once the backend exposes this
   - Favoriting Teardrop presses the heart, and the song appears in Library → Favorites.
   - Unfavoriting releases it.
   - A forced 500 on PUT rolls the heart back and shows "database is down".
+- **Discovery search:**
+  - Typing `jazz` + Enter gives `?tags=jazz` (9 songs, chip inside the field). Adding `late-night` narrows to 1 song, and Backspace removes the last chip.
+  - The "Narrow it down" suggestion adds `dream-pop`, and Clear returns to the "For you" shelves.
+  - In Title mode, reached with the Arrow-key tab switch, "Yesterday" finds 1 song.
+  - There is no overflow at 390 px.
+- **Song tags panel:** on "The Girl From Ipanema", all four categories are visible at once.
+  - Genre (7) shows 5 tags plus "+2". Expanding shows all 7, and collapsing returns to 5.
+  - Adding "Bossa" puts it under Feeling, and removing it deletes the row in the API.
+  - There is no overflow at 390 px.
 - **Source links:** Teardrop shows the Spotify, Apple Music, YouTube and MusicBrainz brand icons. There is no overflow at 390 px.
 - **Mock mode:** the Library and the popover show the "needs the SongTagger API" state, and Discovery falls back to vibes.

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLibrary } from '../app/contexts'
 import { APP_PATHS, libraryPath, type LibraryTab } from '../app/routes'
@@ -10,7 +10,10 @@ import { StateMessage } from '../components/ui/StateMessage'
 import { favoriteSongSummary, type Playlist } from '../domain/library'
 import { PlaylistCard } from '../features/library/PlaylistCard'
 import { PlaylistTrackList } from '../features/library/PlaylistTrackList'
+import { SpotifyExportButton, SpotifyExportStatus } from '../features/library/SpotifyExportButton'
+import { SpotifyImportPanel } from '../features/library/SpotifyImportPanel'
 import { SongGrid, SongGridSkeleton } from '../features/songs/SongGrid'
+import { useSpotifyExport } from '../hooks/useSpotifyExport'
 import styles from './LibraryPage.module.css'
 
 const NAME_LIMIT = 255
@@ -20,11 +23,30 @@ const TABS = [
   { value: 'favorites' as const, label: 'Favorites' },
 ]
 
+type SpotifyReturn = 'connected' | 'error' | null
+
 export function LibraryPage() {
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const tab: LibraryTab = params.get('tab') === 'favorites' ? 'favorites' : 'playlists'
   const selectedId = Number(params.get('playlist')) || null
+  const spotifyParam = params.get('spotify')
+  const [spotifyReturn, setSpotifyReturn] = useState<SpotifyReturn>(
+    spotifyParam === 'connected' || spotifyParam === 'error' ? spotifyParam : null,
+  )
+
+  useEffect(() => {
+    if (spotifyParam !== null) {
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          next.delete('spotify')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }, [spotifyParam, setParams])
 
   return (
     <PageShell>
@@ -37,7 +59,26 @@ export function LibraryPage() {
           onChange={(next) => navigate(libraryPath(next))}
         />
       </header>
-      {tab === 'favorites' ? <Favorites /> : <Playlists selectedId={selectedId} />}
+      {spotifyReturn ? (
+        <div
+          className={spotifyReturn === 'connected' ? styles.notice : styles.noticeError}
+          role={spotifyReturn === 'connected' ? 'status' : 'alert'}
+        >
+          <p>
+            {spotifyReturn === 'connected'
+              ? 'Spotify is connected. You can now import and export playlists.'
+              : 'Spotify did not finish connecting. Try again from “Import from Spotify”.'}
+          </p>
+          <Button variant="ghost" onClick={() => setSpotifyReturn(null)} aria-label="Dismiss">
+            ×
+          </Button>
+        </div>
+      ) : null}
+      {tab === 'favorites' ? (
+        <Favorites />
+      ) : (
+        <Playlists selectedId={selectedId} openImport={spotifyReturn === 'connected'} />
+      )}
     </PageShell>
   )
 }
@@ -94,7 +135,7 @@ function Favorites() {
   return <SongGrid songs={favorites.map(favoriteSongSummary)} />
 }
 
-function Playlists({ selectedId }: { selectedId: number | null }) {
+function Playlists({ selectedId, openImport }: { selectedId: number | null; openImport: boolean }) {
   const { status, loadError, playlists, reload } = useLibrary()
 
   if (status === 'unavailable') {
@@ -142,8 +183,12 @@ function Playlists({ selectedId }: { selectedId: number | null }) {
     <div className={styles.playlists}>
       <aside className={styles.sidebar}>
         <CreatePlaylistForm />
+        <SpotifyImportPanel initiallyOpen={openImport} />
         {playlists.length === 0 ? (
-          <p className={styles.muted}>No playlists yet. Create one here, or from any song page.</p>
+          <p className={styles.muted}>
+            No playlists yet. Create one here, import one from Spotify, or add songs from any song
+            page.
+          </p>
         ) : (
           <ul className={styles.playlistGrid}>
             {playlists.map((playlist) => (
@@ -206,6 +251,7 @@ function PlaylistDetail({ playlist }: { playlist: Playlist }) {
   const [confirming, setConfirming] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [draftName, setDraftName] = useState(playlist.name)
+  const spotifyExport = useSpotifyExport(playlist)
   const created = new Date(playlist.created_at)
 
   async function handleDelete() {
@@ -280,6 +326,11 @@ function PlaylistDetail({ playlist }: { playlist: Playlist }) {
           </div>
         ) : (
           <div className={styles.headerActions}>
+            <SpotifyExportButton
+              playlist={playlist}
+              busy={spotifyExport.state.kind === 'busy'}
+              onExport={spotifyExport.run}
+            />
             <Button variant="ghost" onClick={startRename}>
               Rename
             </Button>
@@ -289,6 +340,7 @@ function PlaylistDetail({ playlist }: { playlist: Playlist }) {
           </div>
         )}
       </div>
+      <SpotifyExportStatus state={spotifyExport.state} onDismiss={spotifyExport.dismiss} />
       {actionError ? (
         <p className={styles.error} role="alert">
           {actionError}

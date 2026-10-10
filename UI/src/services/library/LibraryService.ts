@@ -4,6 +4,9 @@ import type {
   LibraryUser,
   Playlist,
   PlaylistList,
+  SpotifyExportResult,
+  SpotifyImportResult,
+  SpotifyPlaylistList,
 } from '../../domain/library'
 
 export type LibrarySourceKind = 'http' | 'unavailable'
@@ -22,6 +25,10 @@ export interface LibraryService {
   listFavorites(): Promise<FavoriteList>
   addFavorite(songId: number): Promise<FavoriteSong>
   removeFavorite(songId: number): Promise<void>
+  spotifyConnectUrl(): Promise<string>
+  listSpotifyPlaylists(): Promise<SpotifyPlaylistList>
+  importSpotifyPlaylist(spotifyPlaylistId: string): Promise<SpotifyImportResult>
+  exportToSpotify(playlistId: number): Promise<SpotifyExportResult>
 }
 
 export class LibraryUnavailableError extends Error {
@@ -35,5 +42,12 @@ export class FavoritesUnsupportedError extends Error {
   constructor() {
     super('Favorites are coming soon. The API does not have favorites endpoints yet.')
     this.name = 'FavoritesUnsupportedError'
+  }
+}
+
+export class SpotifyNotConnectedError extends Error {
+  constructor() {
+    super('Connect your Spotify account to import and export playlists.')
+    this.name = 'SpotifyNotConnectedError'
   }
 }
