@@ -503,3 +503,32 @@ The song page picks one of seven "scenes" from the song's real tags. Only the mo
 - **Phone overflow:** since the "Tag these songs" nav item was added, `AppNavBar` overflows phone widths by about 34 px on every page (the search field and avatar run past the edge). It needs a shorter label or a scrollable nav on small screens.
 - **`happy-dom`:** it is declared in `UI/package.json` but was not installed. `npm install` fixes it; there is no lockfile in `UI/`.
 - **Formatting:** `npm run format:check` flags seven files from the minigame commit (`router.tsx`, `routes.ts`, `AppNavBar.tsx`, `TagChip.tsx`, `TagChip.module.css`, `tagQueue.ts` and `CommunityPage.test.tsx`).
+
+## Library › Favorites search
+
+The Favorites tab (`UI/src/pages/LibraryPage.tsx`, `Favorites`) has the same search bar as Discovery: the `SearchPanel` component, with the Tags / Title tabs, active tag chips, Clear, and the "Try / Narrow it down" suggestions.
+
+**Scope:** it searches only your favorites, in the browser, and never imports anything.
+- The full songs, with tags, come from `usePlaylistSongs(favoriteIds)`, one request per favorite.
+- **Tags:** keeps favorites that have every chosen tag. Matching uses normalized tokens (`toToken`), so hyphenated genres work here.
+- **Title:** keeps favorites whose title contains the text, and whose artist contains the artist text when given, ignoring case and accents (`foldText`).
+- **Suggestions:** the most common non-artist tags among your favorites. With a tag active, they come only from the matching songs, so "Narrow it down" always leads to results.
+
+**Interface:**
+- The search lives in the URL (`/library?tab=favorites&tags=jazz+late-night`, or `&title=…&artist=…`) through `libraryPath(tab, playlistId, search)`, which shares its writer with `discoverPath`. Switching tabs clears it.
+- A status line reads "N of M favorites match".
+- No match shows "No favorites match" with a Clear search button. If the tags fail to load, the page explains it and offers a retry.
+
+**`SearchPanel` changes:** two optional props, `suggestions` and `titleNote`. Without them, Discovery is unchanged (verified).
+
+**Code and tests:**
+- Logic: `domain/favoritesSearch.ts` (`filterSongs`, `topTags`).
+- Tests: `favoritesSearch.test.ts` and `app/routes.test.ts`.
+
+**Verified in Chrome against the real API (ada, 5 favorites):**
+- The "electronic" suggestion gave 3 of 5 and wrote `tags=electronic` to the URL.
+- Every narrow-down suggestion gave 2 or 3 results.
+- An impossible tag showed the empty state, and Clear restored all 5.
+- The title "sampa" gave 1 of 5.
+- At 390 px the content fits; the shared nav overflow noted above remains.
+- No console errors.

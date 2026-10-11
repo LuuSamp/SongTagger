@@ -144,3 +144,14 @@
   color: var(--color-danger);
   font-size: var(--text-sm);
 }
+
+.favorites {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.matchCount {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
