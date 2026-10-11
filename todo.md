@@ -157,6 +157,10 @@ Reordering (`features/library/PlaylistTrackList.tsx`) works like this:
 
 ### Discovery "For you"
 
+**Picked for you** is the first shelf. It calls `GET /user/{id}/recommendations?limit=10` through `services/recommendations/` and `hooks/useRecommendations.ts`, and shows each card's reason ("Because dreamy · electronic") with those tags highlighted. It refetches when favorites or playlist contents change. It is hidden in mock mode, on errors, or when the user has no signal yet, so the shelves below still work. See "Recommendations" at the end of this file.
+
+The tag shelves below it are built in the browser:
+
 1. `usePlaylistSongs` fetches full songs (with tags) for up to 12 distinct songs across the user's playlists. It needs `GET /users/{u}/songs/{id}` per song, because `PlaylistSong` has no tags.
 2. `topInterests` ranks those songs' tags: tags shared by several songs come first, then it alternates between songs (genre > feeling > instrument > artist).
 3. `useShelves` runs one tag search per interest and excludes songs already in playlists. The page shows the first 3 non-empty shelves.
@@ -176,7 +180,7 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 | Generated artwork | `features/songs/SongArtwork.tsx` | No cover art in the API/DB | Deterministic per song. Playlist songs have no tags, so their artwork uses a hashed palette. | Add cover URLs; keep generated art as fallback. |
 | Landing showcase songs | `config/showcase.ts` | Editorial config for the landing hero | Static. Every title and tag was checked against the seeded database: each link returns at least 1 song. | Keep, or feed from a featured-songs endpoint later. |
 | Vibe collections | `config/vibes.ts` | Editorial config; each vibe is a real tag query | Static | Checked against the seeded DB: every main query (dream-pop, jazz, electronic, mpb, soul, rock) and chip has songs. The chips `modal-jazz`, `hard-bop`, `tropicalia`, `groovy` and `synth-pop` were replaced because they returned nothing or cannot be searched (see D). |
-| Similar songs and Discovery interests | `hooks/useSimilarSongs.ts`, `domain/interests.ts`, `hooks/usePlaylistSongs.ts` | No recommendations endpoint | Real queries, client-side ranking | Replace with a recommendations endpoint. |
+| Similar songs and "Because you like" shelves | `hooks/useSimilarSongs.ts`, `domain/interests.ts`, `hooks/usePlaylistSongs.ts` | Built before the recommendations endpoint existed | Real queries, client-side ranking | "Picked for you" already uses the real endpoint. Move similar songs to a server-side song-to-song version of the same tag profiles. |
 | Demo database content | `db/seed_demo.py` | The user asked for test data | Idempotent script | Keep for local development. Never run it against production. |
 | Community page | `pages/CommunityPage.tsx` | Placeholder requested | Static "Coming soon" | Implement once activity/counts endpoints exist. |
 
@@ -218,7 +222,7 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 6. **No user creation or auth.** Users exist only through SQL or the demo seed. `VITE_SONGTAGGER_USERNAME` decides who is acting.
 7. **No CORS.** The UI depends on the Vite proxy. Production needs a reverse proxy or `CORSMiddleware`.
 8. **No tag counts, listing or autocomplete.** This blocks the popularity bars and tag suggestions.
-9. **Playback and recommendations** are not implemented. Community is a placeholder.
+9. **Listening history is not recorded.** `user_songs.action = 'listen'` exists, and the recommender already weighs it (1.0), but nothing writes it.
 
 ### Frontend known issues
 - **Playlist duplicates.** The API allows duplicate songs in a playlist. The detail view shows each row, but unchecking a song in the popover removes only its first membership, so the song stays checked while another copy remains.
@@ -228,7 +232,7 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 - **StrictMode double fetches.** In development, StrictMode fetches twice (harmless). There is no `AbortController` cancellation.
 - **Local MariaDB is not a Windows service.** It must be started manually after a reboot (command above). Run the MSI installer as administrator if a service is wanted.
 - **Accessibility.** Basics are in place (labels, focus rings, `aria-*`, reduced motion). No axe or Lighthouse audit has been run.
-- **Tests.** There are 16 Vitest unit tests: tag normalization, the mock catalog, playlist helpers, interests, and the `httpLibrary` request mapping. Browser checks were throwaway Playwright scripts, not a committed E2E suite.
+- **Tests.** There are 45 Vitest unit tests, covering tag normalization, the mock catalog, playlist helpers, interests, playback parsing, wave paths, and the `httpLibrary` and `httpRecommendations` request mapping. Browser checks were throwaway Playwright scripts, not a committed E2E suite.
 
 ## E. Integration roadmap (priority order)
 
@@ -240,7 +244,7 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 6. **CORS or a production reverse proxy**, plus a configurable `apiBaseUrl`.
 7. **Tag counts and autocomplete**, for the popularity bars from reference 1 and tag suggestions.
 8. **Community page**, built on community-wide activity and counts.
-9. **Recommendations endpoint** to replace client-side similar-songs and interests ranking.
+9. **Recommendations, next steps:** record listens and skips (from the embed player or Spotify recently-played), add a "not for me" negative signal, and move similar songs to the server. Then re-run the evaluation in `API/Recommender/RESULTS.md` once there are dozens of active listeners.
 10. **Committed E2E tests** (Playwright) for the flows below against a seeded test database, plus an axe audit.
 11. **Robustness:** request cancellation, per-action pending state, and friendlier 5xx messages.
 
@@ -361,3 +365,42 @@ While a song is actually playing in the cover player, the scene reacts in both s
 - **Apple Music:** no public playback events exist, so focusing or clicking into the Apple player is treated as "playing" until it is closed or switched. **This is a heuristic.** Pausing inside the Apple player does not turn the light off.
 
 Closing the player, switching provider or leaving the page always turns the light off.
+
+## Recommendations (implemented)
+
+**What it is:** `GET /user/{user_id}/recommendations?limit=1..50` (default 20) returns `{ songs: [{ song: UserSong, score, because: Tag[] }] }`.
+- `404` for an unknown user, `400` for `catalog`, `422` for an invalid `limit`.
+- A user with no likes, playlists or own tags gets `{ songs: [] }`.
+
+**Where it lives:**
+- `API/Recommender/`: pure numpy, no database. `data.py` holds the input rows, `matrices.py` builds A and B, `model.py` scores, ranks and explains, and `evaluate.py` holds the offline protocol and the synthetic listeners.
+- `API/Services/recommendations.py`: loads a snapshot from MariaDB and caches the model.
+- The route is in `API/Controllers/routes.py` and the schemas `RecommendedSong` / `Recommendations` are in `API/Models/schemas.py`.
+- `numpy==2.2.6` was added to `requirements.txt`.
+
+**How it scores:** the cosine between the user's tag profile and each song's tag profile, blended 80/20 with popularity among listeners.
+- Song profile: tags × IDF, so rare tags count more.
+- User profile: 60% the tags they applied, 40% the tags of songs they liked, saved or tagged, weighted 3 / 2 / 1.5 and decayed over 90 days.
+- Ranking rules: known songs are excluded, there are at most 2 songs per artist, and `because` lists the two tags that contributed most.
+
+**How it was chosen:** `API/Recommender/RESULTS.md` has the full tables and intervals. Tag scoring, user-profile mixes, decay, normalizations, tag diffusion, dot product versus cosine, MMR diversity and popularity blends were compared with leave-one-out NDCG@10 on the 3 real listeners and on simulated listeners.
+
+**Caching:** the model is rebuilt when a fingerprint of `songs`, `tags`, `song_tags`, `user_songs` and `playlist_songs` changes, or after one hour.
+- Building it takes under 1 ms.
+- Most of a request's time goes to the database queries that load the songs.
+- The model is per API process: several workers would each keep their own copy.
+
+**Tests:**
+- `tests/test_recommender.py` (pure, 6 tests): A and B scoring, ranking, the artist cap, holdout leakage, and an offline regression test. The shipped blend must beat both content-only and popularity-only on a fixed synthetic world.
+- `tests/test_recommendations.py` (MariaDB, 4 tests): the error and empty cases, the expected neighborhood, known-song exclusion, and model reuse versus rebuild.
+- `UI/src/services/recommendations/httpRecommendations.test.ts`.
+
+**Verified on the real seeded database (API on :8001):**
+- ada, bia and caio each got 20 songs, none of them already known to that user.
+- Example reasons: bia → Teardrop "dreamy · late night", caio → Aquele abraço "sunny · bossa nova".
+- `/discover` shows "Picked for you" first at 1440 px and 390 px, with one request per page, no overflow and no console errors.
+
+**Limits:**
+- Only 3 real listeners, so the choice leans on synthetic data. The synthetic tastes are genre-based, which favors content methods.
+- Songs without catalog genre tags (36 of 105) can only be matched through artist tags or listener tags.
+- Listens are not recorded yet.

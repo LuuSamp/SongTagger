@@ -1,8 +1,8 @@
-"""Song, tag, playlist, favorite, and community routes. HTTP only; catalog rules live in services."""
+"""Song, tag, playlist, favorite, community, and recommendation routes. HTTP only; catalog rules live in services."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Query, Response
 
 from db.manager import CATALOG_USERNAME
 
@@ -15,6 +15,7 @@ from API.Models import (
     PlaylistOrder,
     PlaylistSongWrite,
     PlaylistWrite,
+    Recommendations,
     SongSearch,
     TagWrite,
     User,
@@ -26,6 +27,7 @@ from API.Services.community import CommunityService
 from API.Services.errors import BadRequest
 from API.Services.favorites import FavoriteService
 from API.Services.playlists import PlaylistService
+from API.Services.recommendations import DEFAULT_LIMIT, MAX_LIMIT, RecommendationService
 from API.Services.search import SearchService
 from API.Services.songs import SongService
 from API.Services.tags import TagService
@@ -38,6 +40,7 @@ def build_router(
     playlists: PlaylistService,
     community: CommunityService,
     favorites: FavoriteService,
+    recommendations: RecommendationService,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -131,6 +134,10 @@ def build_router(
     def remove_favorite(user_id: int, song_id: int) -> Response:
         favorites.remove(user_id, song_id)
         return Response(status_code=204)
+
+    @router.get("/user/{user_id}/recommendations", response_model=Recommendations)
+    def recommend(user_id: int, limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)) -> dict:
+        return recommendations.recommend(user_id, limit)
 
     return router
 

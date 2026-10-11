@@ -6,13 +6,16 @@ import { PageShell } from '../components/layout/PageShell'
 import { Button } from '../components/ui/Button'
 import { StateMessage } from '../components/ui/StateMessage'
 import { featuredVibes } from '../config/vibes'
+import type { Recommendations } from '../domain/types'
 import { topInterests } from '../domain/interests'
 import { distinctSongIds } from '../domain/library'
 import { SearchPanel } from '../features/discovery/SearchPanel'
 import { SearchResults } from '../features/discovery/SearchResults'
 import { SongShelf } from '../features/discovery/SongShelf'
+import type { AsyncState } from '../hooks/useAsync'
 import { usePlaylistSongs } from '../hooks/usePlaylistSongs'
 import { useShelves, type Shelf, type ShelfRequest } from '../hooks/useShelves'
+import { useRecommendations } from '../hooks/useRecommendations'
 import { useSongSearch } from '../hooks/useSongSearch'
 import styles from './DiscoverPage.module.css'
 
@@ -21,6 +24,7 @@ const SONGS_PER_SHELF = 5
 const VISIBLE_SHELVES = 3
 const CANDIDATE_INTERESTS = 6
 const PLAYLIST_SONGS_SAMPLED = 12
+const PICKED_FOR_YOU = 10
 
 interface ShelfCopy {
   eyebrow: string
@@ -103,6 +107,15 @@ function ForYou() {
   )
   const { state, reload } = useShelves(deciding ? [] : requests, excludeIds, SONGS_PER_SHELF)
   const shelves = visibleShelves(requests, state.data, personalized)
+  const libraryKey = useMemo(
+    () =>
+      [
+        favoriteIds.join(','),
+        playlists.map((playlist) => playlist.songs.map((song) => song.song_id).join(',')).join(';'),
+      ].join('|'),
+    [favoriteIds, playlists],
+  )
+  const picked = useRecommendations(PICKED_FOR_YOU, libraryKey, !deciding)
 
   if (deciding) {
     return (
@@ -114,6 +127,7 @@ function ForYou() {
 
   return (
     <section className={styles.forYou} aria-label="For you">
+      <PickedForYou state={picked.state} />
       {personalized ? null : (
         <StateMessage
           title="Make Discovery yours"
@@ -171,4 +185,42 @@ function visibleShelves(
     }))
     .filter((entry) => !hideEmpty || entry.songs.length > 0)
     .slice(0, VISIBLE_SHELVES)
+}
+
+function PickedForYou({ state }: { state: AsyncState<Recommendations> }) {
+  const songs = useMemo(() => state.data?.songs.map((item) => item.song) ?? null, [state.data])
+  const notes = useMemo(
+    () =>
+      new Map(
+        (state.data?.songs ?? [])
+          .filter((item) => item.because.length > 0)
+          .map((item) => [
+            item.song.id,
+            `Because ${item.because.map((tag) => tag.name).join(' · ')}`,
+          ]),
+      ),
+    [state.data],
+  )
+  const tokens = useMemo(
+    () => [
+      ...new Set((state.data?.songs ?? []).flatMap((item) => item.because.map((tag) => tag.token))),
+    ],
+    [state.data],
+  )
+  if (state.status === 'idle' || state.status === 'error') {
+    return null
+  }
+  if (state.status === 'success' && state.data.songs.length === 0) {
+    return null
+  }
+  return (
+    <SongShelf
+      id="picked-for-you"
+      eyebrow="Picked for you"
+      title="From everything you tag, save and love"
+      songs={state.status === 'success' ? songs : null}
+      highlightTokens={tokens}
+      notes={notes}
+    />
+  )
 }

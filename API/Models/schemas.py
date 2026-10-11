@@ -149,3 +149,13 @@ class FavoriteSong(BaseModel):
 
 class FavoriteList(BaseModel):
     songs: list[FavoriteSong]
+
+
+class RecommendedSong(BaseModel):
+    song: UserSong
+    score: float
+    because: list[Tag]
+
+
+class Recommendations(BaseModel):
+    songs: list[RecommendedSong]

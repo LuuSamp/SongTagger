@@ -86,3 +86,13 @@ export interface CommunityFeed {
   tags_window: CommunityWindow
   rising_tags: RisingTag[]
 }
+
+export interface RecommendedSong {
+  song: UserSong
+  score: number
+  because: Tag[]
+}
+
+export interface Recommendations {
+  songs: RecommendedSong[]
+}

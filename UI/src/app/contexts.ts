@@ -7,6 +7,7 @@ import type {
 } from '../domain/library'
 import type { CatalogService } from '../services/catalog'
 import type { LibrarySourceKind } from '../services/library'
+import type { RecommendationService } from '../services/recommendations'
 import type { FavoritesState } from './useFavoritesState'
 
 export interface Session {
@@ -15,6 +16,7 @@ export interface Session {
 
 export const SessionContext = createContext<Session | null>(null)
 export const CatalogContext = createContext<CatalogService | null>(null)
+export const RecommendationsContext = createContext<RecommendationService | null>(null)
 
 export type LibraryStatus = 'loading' | 'ready' | 'unavailable' | 'error'
 
@@ -66,4 +68,12 @@ export function useLibrary(): LibraryActions {
     throw new Error('useLibrary must be used inside AppProviders')
   }
   return library
+}
+
+export function useRecommendationService(): RecommendationService {
+  const recommendations = useContext(RecommendationsContext)
+  if (!recommendations) {
+    throw new Error('useRecommendationService must be used inside AppProviders')
+  }
+  return recommendations
 }

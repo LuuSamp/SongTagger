@@ -1,5 +1,6 @@
 fastapi
 uvicorn
 pymysql
+numpy==2.2.6
 httpx
 pytest
