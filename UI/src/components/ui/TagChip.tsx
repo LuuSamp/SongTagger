@@ -15,6 +15,7 @@ interface TagChipProps {
   onRemove?: () => void
   removeLabel?: string
   pending?: boolean
+  pressed?: boolean
   title?: string
 }
 
@@ -28,6 +29,7 @@ export function TagChip({
   onRemove,
   removeLabel,
   pending = false,
+  pressed,
   title,
 }: TagChipProps) {
   const className = [
@@ -35,6 +37,7 @@ export function TagChip({
     styles[tone],
     size === 'sm' ? styles.sm : null,
     pending ? styles.pending : null,
+    pressed ? styles.flash : null,
   ]
     .filter(Boolean)
     .join(' ')
@@ -60,7 +63,13 @@ export function TagChip({
     )
   } else if (onClick) {
     main = (
-      <button type="button" className={styles.action} onClick={onClick} title={title}>
+      <button
+        type="button"
+        className={styles.action}
+        onClick={onClick}
+        title={title}
+        aria-pressed={pressed}
+      >
         {body}
       </button>
     )

@@ -1,0 +1,353 @@
+// @vitest-environment happy-dom
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { MemoryRouter } from 'react-router-dom'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  CatalogContext,
+  LibraryContext,
+  SessionContext,
+  type LibraryActions,
+} from '../app/contexts'
+import { router } from '../app/router'
+import type { FavoriteSong, Playlist } from '../domain/library'
+import type { CatalogService } from '../services/catalog'
+import type { TagWrite, UserSong, UserTag } from '../domain/types'
+import { TagPage } from './TagPage'
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+
+const favoriteSong = song(1, 'Favorite Tune', [
+  tag('feeling', 'Warm'),
+  tag('instrument', 'Piano'),
+  tag('genre', 'Jazz'),
+])
+const playlistSong = song(2, 'Playlist Tune', [tag('feeling', 'Bright')])
+
+let root: Root | null = null
+
+afterEach(() => {
+  act(() => {
+    root?.unmount()
+  })
+  root = null
+  document.body.innerHTML = ''
+})
+
+describe('Tag these songs', () => {
+  it('registers /tag', () => {
+    const paths = router.routes.flatMap((route) => route.children?.map((child) => child.path) ?? [])
+
+    expect(paths).toContain('/tag')
+  })
+
+  it('shows a favorite before a song that is only on a playlist', async () => {
+    const view = await renderQueue()
+
+    expect(text(view)).toContain('Favorite Tune')
+    expect(text(view)).not.toContain('Playlist Tune')
+  })
+
+  it('selecting a chip marks it as added and does not attach yet', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Warm')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(pressed(view, 'Warm')).toBe('true')
+    expect(chipClass(view, 'Warm')).toMatch(/mine/)
+    expect(buttons(view)).toContain('Warm')
+    expect(text(view)).toContain('Favorite Tune')
+    expect(text(view)).not.toContain('Playlist Tune')
+  })
+
+  it('clicking a selected chip deselects it', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Warm')
+    await click(view, 'Warm')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(pressed(view, 'Warm')).toBe('false')
+    expect(chipClass(view, 'Warm')).not.toMatch(/mine/)
+    expect(buttons(view)).toContain('Warm')
+  })
+
+  it('go to next attaches the selected chips and shows the following song', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Warm')
+    await click(view, 'Piano')
+    expect(addTag).not.toHaveBeenCalled()
+    await click(view, 'Go to next')
+
+    expect(addTag).toHaveBeenCalledTimes(2)
+    expect(addTag).toHaveBeenCalledWith(1, { kind: 'feeling', token: 'warm' })
+    expect(addTag).toHaveBeenCalledWith(1, { kind: 'instrument', token: 'piano' })
+    expect(text(view)).toContain('Playlist Tune')
+    expect(text(view)).not.toContain('Favorite Tune')
+  })
+
+  it('go to next does not attach a chip that was deselected', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Warm')
+    await click(view, 'Warm')
+    await click(view, 'Go to next')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(text(view)).toContain('Playlist Tune')
+  })
+
+  it('go to next does not call attach and shows the following song', async () => {
+    const addTag = vi.fn()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Go to next')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(text(view)).toContain('Playlist Tune')
+    expect(text(view)).not.toContain('Favorite Tune')
+  })
+
+  it('does not show a song again after go to next in that visit', async () => {
+    const view = await renderQueue()
+
+    await click(view, 'Go to next')
+    expect(text(view)).not.toContain('Favorite Tune')
+
+    await click(view, 'Go to next')
+    expect(text(view)).not.toContain('Favorite Tune')
+    expect(text(view)).not.toContain('Playlist Tune')
+  })
+
+  it('waits to show a song that has no feeling or instrument chip left', async () => {
+    const heard = song(4, 'Heard It', [tag('feeling', 'Warm', true), tag('genre', 'Jazz')])
+    const open = song(5, 'Still Open', [tag('instrument', 'Cello')])
+    const view = await renderQueue({
+      favorites: [favorite(4, 'Heard It')],
+      playlists: [playlist([track(5, 'Still Open'), track(4, 'Heard It')])],
+      songs: [heard, open],
+    })
+
+    expect(text(view)).toContain('Still Open')
+    expect(text(view)).not.toContain('Heard It')
+    expect(buttons(view)).not.toContain('Jazz')
+  })
+
+  it('uses the page title as the only heading and keeps kind dots on the chips', async () => {
+    const view = await renderQueue()
+
+    expect(view.querySelector('h1')?.textContent).toBe('Tag these songs')
+    expect(view.querySelector('h2, h3')).toBeNull()
+    expect(text(view)).not.toContain('What do you hear?')
+    expect(view.innerHTML).toContain('var(--tag-feeling)')
+    expect(view.innerHTML).toContain('var(--tag-instrument)')
+    expect(buttons(view)).toContain('Add tag')
+    expect(buttons(view)).toContain('Go to next')
+    expect(buttons(view)).not.toContain('Jazz')
+  })
+
+  it('shows one short line when the queue is empty', async () => {
+    const view = await renderQueue({ favorites: [], playlists: [], songs: [] })
+    const message = view.querySelector('[role="status"]')
+
+    expect(message?.textContent).toBe('Nothing to tag right now')
+    expect(buttons(view)).not.toContain('Go to next')
+  })
+
+  it('does not treat a loading library as an empty queue', () => {
+    const view = renderNow({
+      favoritesStatus: 'loading',
+      status: 'loading',
+      favorites: [],
+      playlists: [],
+      songs: [],
+    })
+
+    expect(text(view)).not.toContain('Nothing to tag right now')
+  })
+})
+
+function savedTag(): CatalogService['addTag'] {
+  return vi.fn(async (_songId: number, written: TagWrite) => ({
+    kind: written.kind,
+    token: written.token,
+    name: written.token,
+    applied_by_me: true,
+  }))
+}
+
+function song(id: number, title: string, tags: UserTag[]): UserSong {
+  return {
+    id,
+    title,
+    artist_credit: 'Ada Lovelace',
+    duration_ms: 180000,
+    mbid: null,
+    isrc: null,
+    disambiguation: null,
+    image_url: null,
+    sources: [],
+    tags,
+  }
+}
+
+function tag(kind: UserTag['kind'], name: string, applied = false): UserTag {
+  return {
+    kind,
+    name,
+    token: name.toLowerCase().replace(/ /g, '-'),
+    applied_by_me: applied,
+  }
+}
+
+function favorite(songId: number, title: string): FavoriteSong {
+  return {
+    song_id: songId,
+    title,
+    artist_credit: 'Ada Lovelace',
+    favorited_at: '2026-10-10T12:00:00',
+  }
+}
+
+function track(songId: number, title: string, position = 1) {
+  return {
+    membership_id: songId,
+    position,
+    song_id: songId,
+    title,
+    artist_credit: 'Ada Lovelace',
+    image_url: null,
+  }
+}
+
+function playlist(songs: Playlist['songs']): Playlist {
+  return {
+    id: 7,
+    name: 'Night',
+    created_at: '2026-10-10T12:00:00',
+    image_url: null,
+    songs,
+  }
+}
+
+interface QueueOptions {
+  favorites?: FavoriteSong[]
+  playlists?: Playlist[]
+  songs?: UserSong[]
+  addTag?: CatalogService['addTag']
+  favoritesStatus?: LibraryActions['favoritesStatus']
+  status?: LibraryActions['status']
+}
+
+function queueOptions(options: QueueOptions = {}): Required<QueueOptions> {
+  return {
+    favorites: options.favorites ?? [favorite(1, 'Favorite Tune')],
+    playlists: options.playlists ?? [
+      playlist([track(2, 'Playlist Tune', 1), track(1, 'Favorite Tune', 2)]),
+    ],
+    songs: options.songs ?? [favoriteSong, playlistSong],
+    addTag:
+      options.addTag ??
+      (async (_songId: number, written: TagWrite) => ({
+        kind: written.kind,
+        token: written.token,
+        name: written.token,
+        applied_by_me: true,
+      })),
+    favoritesStatus: options.favoritesStatus ?? 'ready',
+    status: options.status ?? 'ready',
+  }
+}
+
+function renderNow(options: QueueOptions = {}): HTMLElement {
+  const resolved = queueOptions(options)
+  const byId = new Map(resolved.songs.map((entry) => [entry.id, entry]))
+  const catalog = {
+    kind: 'http',
+    getSong: (songId: number) => {
+      const found = byId.get(songId)
+      return found ? Promise.resolve(found) : Promise.reject(new Error(`missing ${songId}`))
+    },
+    addTag: resolved.addTag,
+  } as CatalogService
+  const library = {
+    kind: 'http',
+    status: resolved.status,
+    favoritesStatus: resolved.favoritesStatus,
+    favorites: resolved.favorites,
+    playlists: resolved.playlists,
+    loadError: null,
+    favoritesError: null,
+  } as LibraryActions
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+  act(() => {
+    root?.render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SessionContext.Provider value={{ username: 'ada' }}>
+          <CatalogContext.Provider value={catalog}>
+            <LibraryContext.Provider value={library}>
+              <TagPage />
+            </LibraryContext.Provider>
+          </CatalogContext.Provider>
+        </SessionContext.Provider>
+      </MemoryRouter>,
+    )
+  })
+  return container
+}
+
+async function renderQueue(options: QueueOptions = {}): Promise<HTMLElement> {
+  const view = renderNow(options)
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  return view
+}
+
+function text(view: HTMLElement): string {
+  return view.textContent ?? ''
+}
+
+function buttons(view: HTMLElement): string[] {
+  return [...view.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
+}
+
+function chipButton(view: HTMLElement, name: string): HTMLButtonElement {
+  const button = [...view.querySelectorAll('button')].find(
+    (element) => element.textContent?.trim() === name,
+  )
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`No chip named ${name}`)
+  }
+  return button
+}
+
+function pressed(view: HTMLElement, name: string): string | null {
+  return chipButton(view, name).getAttribute('aria-pressed')
+}
+
+function chipClass(view: HTMLElement, name: string): string {
+  return chipButton(view, name).parentElement?.className ?? ''
+}
+
+async function click(view: HTMLElement, name: string) {
+  const button = [...view.querySelectorAll('button')].find(
+    (element) => element.textContent?.trim() === name,
+  )
+  if (!button) {
+    throw new Error(`No button named ${name}. Saw: ${buttons(view).join(', ')}`)
+  }
+  await act(async () => {
+    button.click()
+    await Promise.resolve()
+  })
+}

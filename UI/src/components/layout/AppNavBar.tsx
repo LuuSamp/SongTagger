@@ -10,6 +10,7 @@ import styles from './AppNavBar.module.css'
 const NAV_ITEMS = [
   { to: APP_PATHS.discover, label: 'Discovery' },
   { to: APP_PATHS.community, label: 'Community' },
+  { to: APP_PATHS.tag, label: 'Tag these songs' },
   { to: APP_PATHS.library, label: 'Library' },
 ]
 

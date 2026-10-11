@@ -6,6 +6,7 @@ export const APP_PATHS = {
   discover: '/discover',
   community: '/community',
   library: '/library',
+  tag: '/tag',
 } as const
 
 export type DiscoverQuery = { tags: string[] } | { title: string; artist?: string }

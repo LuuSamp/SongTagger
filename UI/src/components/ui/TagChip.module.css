@@ -109,6 +109,23 @@
   opacity: 0.55;
 }
 
+.flash {
+  animation: choose var(--motion-base) ease-out;
+}
+
+@keyframes choose {
+  0% {
+    background: var(--color-accent);
+    border-color: var(--color-accent-strong);
+    color: var(--color-ink-inverse);
+  }
+  100% {
+    background: var(--color-accent-soft);
+    border-color: var(--color-accent);
+    color: var(--color-accent-strong);
+  }
+}
+
 .sm {
   min-height: 30px;
   font-size: 0.8125rem;

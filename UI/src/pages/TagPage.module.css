@@ -1,0 +1,50 @@
+.column {
+  display: grid;
+  gap: var(--space-6);
+  width: min(100%, 28rem);
+  margin-inline: auto;
+}
+
+.title {
+  font-size: var(--text-3xl);
+  text-transform: uppercase;
+}
+
+.prompt {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.artTitle {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.artArtist {
+  margin-top: var(--space-1);
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.loading {
+  min-height: 12rem;
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}

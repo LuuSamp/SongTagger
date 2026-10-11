@@ -5,6 +5,7 @@ import { LandingPage } from '../pages/LandingPage'
 import { LibraryPage } from '../pages/LibraryPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { SongPage } from '../pages/SongPage'
+import { TagPage } from '../pages/TagPage'
 import { RootLayout } from './RootLayout'
 import { APP_PATHS } from './routes'
 
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
       { path: APP_PATHS.discover, element: <DiscoverPage /> },
       { path: APP_PATHS.community, element: <CommunityPage /> },
       { path: APP_PATHS.library, element: <LibraryPage /> },
+      { path: APP_PATHS.tag, element: <TagPage /> },
       { path: '/songs/:songId', element: <SongPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
