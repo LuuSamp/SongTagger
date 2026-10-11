@@ -318,3 +318,23 @@ The `catalog` user is always excluded, and each person counts once per song and 
 - Scores are computed per request in Python. Fine at this size; precompute in a periodic job if traffic grows.
 - Existing playlist memberships got the migration time as their `created_at`.
 - After pulling this change, run `python -m db.manager` once and restart the API process.
+
+
+## Song player (embeds, on demand)
+
+`features/songs/CoverPlayer.tsx` wraps the hero cover on the song page.
+
+**What it does:**
+- When a song has an embeddable source, a glass play button sits in the middle of the cover.
+- Clicking it replaces the cover **in place** with the provider's official embed. The iframe is created only on that click, so nothing loads before; closing it removes the iframe, which stops playback.
+- Providers come from the stored `song_sources` ids (`domain/embeds.ts`, strictly validated):
+  - **Spotify:** `open.spotify.com/embed/track/{id}`, the default.
+  - **YouTube:** `youtube-nocookie.com/embed/{id}`.
+  - **Apple Music:** `embed.music.apple.com/{storefront}/song/{id}`.
+- Glass chips switch provider and a glass × closes; Escape also closes. The favorite and playlist buttons stay usable.
+- Spotify and Apple have fixed-height players, and YouTube is shown at 16:9. Each is centred over a blurred copy of the cover, so the square stays full and the top band stays free for the controls.
+- Songs without an embeddable source show no play button.
+
+**Limits:**
+- What plays depends on each provider. Spotify plays a 30s preview unless the visitor is logged in to Spotify in the browser. Apple Music plays a preview unless signed in. YouTube plays the full video.
+- No API call is involved, and listens are not recorded. A `listen` signal for Community would need the provider's playback events, which the embeds do not expose to the page.

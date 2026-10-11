@@ -1,0 +1,138 @@
+.cover {
+  position: relative;
+}
+
+.play {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--motion-base);
+}
+
+.play:hover {
+  background: rgb(20 14 10 / 14%);
+}
+
+.play:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.playIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  padding-left: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass-fill);
+  color: var(--glass-ink);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition:
+    scale var(--motion-base),
+    background-color var(--motion-fast);
+}
+
+.play:hover .playIcon,
+.play:focus-visible .playIcon {
+  scale: 1.08;
+  background: var(--glass-fill-strong);
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-ink);
+  box-shadow: var(--shadow-lifted);
+  animation: reveal var(--motion-base) both;
+}
+
+.backdrop {
+  position: absolute;
+  inset: -24px;
+  filter: blur(18px) brightness(0.55) saturate(1.1);
+}
+
+.iframeVideo {
+  position: absolute;
+  top: 50%;
+  left: var(--space-4);
+  width: calc(100% - 2 * var(--space-4));
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lifted);
+  translate: 0 -40%;
+}
+
+.iframeFixed {
+  position: absolute;
+  top: 50%;
+  left: var(--space-4);
+  width: calc(100% - 2 * var(--space-4));
+  height: min(var(--embed-height), calc(100% - 128px));
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lifted);
+  translate: 0 -40%;
+}
+
+.controls {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 2;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.providers {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.glass {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  background: var(--glass-fill);
+  color: var(--glass-ink);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition: background-color var(--motion-fast);
+}
+
+.glass:hover {
+  background: var(--glass-fill-strong);
+}
+
+.glass[aria-checked='true'] {
+  border-color: var(--glass-ink);
+  background: var(--glass-ink);
+  color: var(--color-ink);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}

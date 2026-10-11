@@ -10,7 +10,7 @@ import type { UserSong } from '../domain/types'
 import { AddToPlaylist } from '../features/library/AddToPlaylist'
 import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
-import { SongArtwork } from '../features/songs/SongArtwork'
+import { CoverPlayer } from '../features/songs/CoverPlayer'
 import { SourceLinks } from '../features/songs/SourceLinks'
 import { SongTagsPanel } from '../features/tags/SongTagsPanel'
 import { useSong } from '../hooks/useSong'
@@ -89,11 +89,11 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
     <article className={styles.layout}>
       <div className={styles.primary}>
         <div className={styles.cover}>
-          <SongArtwork song={song} variant="hero">
+          <CoverPlayer song={song}>
             <p className={styles.artTitle}>{song.title}</p>
             <p className={styles.artArtist}>{song.artist_credit}</p>
             {song.disambiguation ? <p className={styles.artMeta}>{song.disambiguation}</p> : null}
-          </SongArtwork>
+          </CoverPlayer>
           <div className={styles.coverActions} role="group" aria-label="Save this song">
             <FavoriteButton song={song} />
             <AddToPlaylist songId={song.id} songTitle={song.title} />
