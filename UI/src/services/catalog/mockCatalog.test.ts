@@ -49,3 +49,18 @@ describe('mock catalog', () => {
     await expect(catalog().getSong(999)).rejects.toBeInstanceOf(ApiError)
   })
 })
+
+describe('mock community feed', () => {
+  it('ranks songs by listener activity and never counts catalog tags', async () => {
+    const feed = await createMockCatalog(catalogFixtures, {
+      username: 'ada',
+      latencyMs: 0,
+    }).community()
+    expect(feed.trending_window).toBe('all_time')
+    expect(feed.trending.length).toBeGreaterThan(0)
+    expect(feed.trending.every((item) => item.people > 0)).toBe(true)
+    const tokens = feed.rising_tags.map((entry) => entry.tag.token)
+    expect(tokens).not.toContain('mpb')
+    expect(feed.rising_tags.length).toBeLessThanOrEqual(8)
+  })
+})

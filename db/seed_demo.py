@@ -6,7 +6,7 @@ from API.Services.tags import TagService
 from db.manager import load_project_env, open_database
 from db.seed import fold
 
-DEMO_USERS = ("ada", "bia")
+DEMO_USERS = ("ada", "bia", "caio")
 
 DEMO_TAGS: dict[str, list[tuple[str, str, list[tuple[str, str]]]]] = {
     "ada": [
@@ -30,6 +30,15 @@ DEMO_TAGS: dict[str, list[tuple[str, str, list[tuple[str, str]]]]] = {
         ("Gilberto Gil", "Aquele Abraço", [("feeling", "sunny")]),
         ("Jorge Ben Jor", "Mas Que Nada", [("feeling", "carefree"), ("instrument", "percussion")]),
         ("Miles Davis", "So What", [("feeling", "late-night")]),
+    ],
+    "caio": [
+        ("Caetano Veloso", "Sampa", [("feeling", "warm"), ("feeling", "nostalgic")]),
+        ("Elis Regina", "Águas de Março", [("feeling", "sunny")]),
+        ("Antônio Carlos Jobim", "The Girl From Ipanema", [("feeling", "sunny")]),
+        ("Miles Davis", "So What", [("feeling", "late-night"), ("instrument", "trumpet")]),
+        ("Massive Attack", "Teardrop", [("feeling", "dreamy")]),
+        ("Cocteau Twins", "Lorelei", [("feeling", "dreamy")]),
+        ("Daft Punk", "One More Time", [("feeling", "euphoric")]),
     ],
 }
 
@@ -74,6 +83,18 @@ DEMO_PLAYLISTS: dict[str, list[tuple[str, list[tuple[str, str]]]]] = {
                 ("Donna Summer", "I Feel Love"),
                 ("New Order", "Blue Monday"),
                 ("Chic", "Le Freak"),
+            ],
+        ),
+    ],
+    "caio": [
+        (
+            "Domingo",
+            [
+                ("Caetano Veloso", "Sampa"),
+                ("Elis Regina", "Águas de Março"),
+                ("Miles Davis", "So What"),
+                ("Massive Attack", "Teardrop"),
+                ("Daft Punk", "One More Time"),
             ],
         ),
     ],

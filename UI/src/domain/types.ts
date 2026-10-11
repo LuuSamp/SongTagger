@@ -55,3 +55,34 @@ export interface TagWrite {
 }
 
 export type CatalogSong = Song | UserSong
+
+export type CommunityWindow = 'week' | 'all_time'
+
+export interface ConsensusTag extends Tag {
+  people: number
+}
+
+export interface TrendingSong {
+  song: UserSong
+  score: number
+  people: number
+  playlist_adds: number
+  taggers: number
+  likes: number
+  consensus: ConsensusTag[]
+}
+
+export interface RisingTag {
+  tag: Tag
+  recent: number
+  baseline: number
+  growth: number
+  people: number
+}
+
+export interface CommunityFeed {
+  trending_window: CommunityWindow
+  trending: TrendingSong[]
+  tags_window: CommunityWindow
+  rising_tags: RisingTag[]
+}

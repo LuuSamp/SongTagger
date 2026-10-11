@@ -1,4 +1,11 @@
-import type { SongSearch, TagWrite, UserSong, UserSongList, UserTag } from '../../domain/types'
+import type {
+  CommunityFeed,
+  SongSearch,
+  TagWrite,
+  UserSong,
+  UserSongList,
+  UserTag,
+} from '../../domain/types'
 import type { HttpClient } from '../http/httpClient'
 import type { CatalogService } from './CatalogService'
 
@@ -21,6 +28,9 @@ export function createHttpCatalog(http: HttpClient, username: string): CatalogSe
     },
     removeTag(songId, tag: TagWrite) {
       return http.delete(`${user}/songs/${songId}/tags`, tag)
+    },
+    community() {
+      return http.get<CommunityFeed>(`${user}/community`)
     },
   }
 }

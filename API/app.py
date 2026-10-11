@@ -20,6 +20,7 @@ from API.Controllers.spotify_import import build_router as build_spotify_import_
 from API.Controllers.spotify_playlists import build_router as build_spotify_playlists_router
 from API.Controllers.spotify_sync import build_router as build_spotify_sync_router
 from API.Services.errors import APIError
+from API.Services.community import CommunityService
 from API.Services.playlists import PlaylistService
 from API.Services.search import SearchService
 from API.Services.songs import SongService
@@ -74,6 +75,7 @@ def create_app(
             songs,
             TagService(songs),
             playlists,
+            CommunityService(songs),
         )
     )
     app.include_router(build_spotify_router(spotify_auth))

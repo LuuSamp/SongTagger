@@ -96,9 +96,9 @@ Routing (`app/router.tsx`, URLs built by `app/routes.ts`):
 
 | Path | Page | Notes |
 |---|---|---|
-| `/` | `LandingPage` | Vibe panels and pitch, with `LandingHeader`. Legacy `/?tags=` and `/?title=` links redirect to `/discover`. |
+| `/` | `LandingPage` | "Hanging tags" hero (`features/discovery/HangingTags.tsx`): three showcase songs as luggage tags on a string, each with its cover, title and real community tags. Behind them, a canvas (`WindLayer.tsx`, physics in `windField.ts`) draws a faint wind and up to 5 music notes (3 on mobile). The wind gusts on the same 7s period as the tag sway, and the notes drift on it with drag, lift and flutter. The notes stay in the cards' middle band (36%–66% of the height), behind the tags, so they mostly show in the gaps and at the edges. Each note has its own wind gain, wind phase and eddy noise (an Ornstein–Uhlenbeck process), so notes never move in lockstep. It pauses off-screen or in a hidden tab, and is not rendered under reduced motion. Pitch, "Let's begin" and "Explore by vibe" sit on the right. `LandingHeader` shows only the logo. Legacy `/?tags=` and `/?title=` links redirect to `/discover`. |
 | `/discover` | `DiscoverPage` | Search with `?tags=` or `?title=&artist=`. With no query it shows the "For you" shelves. The search is a tag composer (`features/discovery/SearchPanel.tsx`): "Tags · Title" underline tabs, then one large boxed field. The box has an accent border and ring on focus. A magnifier glyph inside it does a small "look around" motion every ~7s, pauses and turns accent while focused, and stays still under reduced motion. Clicking empty space in the box focuses the input. In Tags mode the active tags are removable chips inside the field; Enter or a comma adds tags, and Backspace on an empty input removes the last one. A "Try" / "Narrow it down" row suggests real vibe tokens. Title mode uses the same field with a "by artist" input. |
-| `/community` | `CommunityPage` | Placeholder ("Coming soon"). |
+| `/community` | `CommunityPage` | Aggregate, anonymous community feed from `GET /users/{u}/community` (see "Community" below). It has "Trending this week" shelves with a reason line per song, "Rising tags" chips with people counts, and "In their words": the top tags for the leading songs, with the number of people behind each. |
 | `/library` | `LibraryPage` | The default tab is Playlists. `?tab=favorites` shows the pending-feature notice, and `?playlist=<id>` selects a playlist. |
 | `/songs/:songId` | `SongPage` | A non-numeric id or an API 404 shows "not in the catalog". |
 | `*` | `NotFoundPage` | |
@@ -106,7 +106,7 @@ Routing (`app/router.tsx`, URLs built by `app/routes.ts`):
 In-app pages use `AppNavBar`: the round logo, a search pill (tag search → `/discover?tags=`), DISCOVERY / COMMUNITY / LIBRARY with an active underline, and the avatar. The reference's bell is left out because there are no notifications.
 
 Reference mapping:
-- **Landing** follows image 2.
+- **Landing** keeps image 2's split layout, but the three gradient vibe panels were replaced with hanging luggage tags that echo the logo, because the user found the panels generic.
 - **The app bar** follows the third reference.
 - **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart works once the favorites API exists and shows a "coming soon" note until then. The playlist button carries a count badge and opens its panel right-aligned under the cover. The play button is not shown because playback is not implemented. The tags section (`features/tags/SongTagsPanel.tsx`) shows every category at once, grouped as Artist / Genre / Feeling / Instrument with a colour dot and a count:
   - The header has the title, a count and a round + button that opens the add form.
@@ -174,6 +174,7 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 | Acting user from env (`ada`) | `config/session.ts`, `SessionContext` | No login | Static | Replace with authenticated user (see D). |
 | Brand icons for sources | `features/songs/SourceIcon.tsx`, `features/songs/sourceBrands.ts` | Recognisable links | Brand SVG paths and colours from `simple-icons` (CC0, pinned `16.32.0`; only five icons are bundled). Discogs' near-black brand colour is drawn with the ink token for contrast. Unknown sources use a generic link glyph. The icons only link to each service. | Add a mapping in `sourceBrands.ts` for any new source. |
 | Generated artwork | `features/songs/SongArtwork.tsx` | No cover art in the API/DB | Deterministic per song. Playlist songs have no tags, so their artwork uses a hashed palette. | Add cover URLs; keep generated art as fallback. |
+| Landing showcase songs | `config/showcase.ts` | Editorial config for the landing hero | Static. Every title and tag was checked against the seeded database: each link returns at least 1 song. | Keep, or feed from a featured-songs endpoint later. |
 | Vibe collections | `config/vibes.ts` | Editorial config; each vibe is a real tag query | Static | Checked against the seeded DB: every main query (dream-pop, jazz, electronic, mpb, soul, rock) and chip has songs. The chips `modal-jazz`, `hard-bop`, `tropicalia`, `groovy` and `synth-pop` were replaced because they returned nothing or cannot be searched (see D). |
 | Similar songs and Discovery interests | `hooks/useSimilarSongs.ts`, `domain/interests.ts`, `hooks/usePlaylistSongs.ts` | No recommendations endpoint | Real queries, client-side ranking | Replace with a recommendations endpoint. |
 | Demo database content | `db/seed_demo.py` | The user asked for test data | Idempotent script | Keep for local development. Never run it against production. |
@@ -277,3 +278,45 @@ The frontend is complete and switches on by itself once the backend exposes this
   - There is no overflow at 390 px.
 - **Source links:** Teardrop shows the Spotify, Apple Music, YouTube and MusicBrainz brand icons. There is no overflow at 390 px.
 - **Mock mode:** the Library and the popover show the "needs the SongTagger API" state, and Discovery falls back to vibes.
+
+
+## Community (implemented)
+
+**Backend:** `API/Services/community.py`, served at `GET /users/{username}/community` (models `CommunityFeed`, `TrendingSong`, `RisingTag` and `ConsensusTag` in `API/Models/schemas.py`).
+
+**Signals:**
+- tags applied by listeners (`song_tags`);
+- playlist adds (`playlist_songs`, which now has `created_at`, added by an idempotent `ALTER` in `db/schema.sql`);
+- favorites (`user_songs` with `action = 'like'`). Favorites are ready but still empty until the favorites API exists.
+
+The `catalog` user is always excluded, and each person counts once per song and signal kind.
+
+**Trending:**
+- `score = Σ weight × exp(−age/7 days)`, with like = 3, playlist = 2 and tag = 1, over the last 28 days.
+- A song needs at least 2 distinct people.
+- At most 2 songs per artist, and 10 songs in total.
+- With fewer than 4 qualifying songs, it falls back to all-time totals, and `trending_window` says which window was used.
+
+**Rising tags:**
+- Distinct people in the last 7 days against the weekly average of the 21 days before. `growth = (recent + 1) / (baseline + 1)`.
+- A tag needs at least 2 people, and the top 8 are kept.
+- With fewer than 3 tags, it falls back to the most-used tags of all time (`tags_window`).
+
+**Consensus:** for each trending song, its top 3 non-artist tags by distinct people.
+
+**Privacy:** only aggregate counts are returned, never usernames, and the 2-person minimum avoids exposing one person's taste.
+
+**Tests:** `tests/test_community.py` (7 tests). The full backend suite passes (102 tests).
+
+**Demo data:** `db/seed_demo.py` now also creates `caio`, whose tags and "Domingo" playlist overlap ada and bia, so the demo database has songs with 2–3 people.
+
+**Frontend:**
+- `CatalogService.community()` is implemented in both data sources. The mock version uses the fixtures and always answers as `all_time`.
+- `hooks/useCommunity.ts` loads the feed and `pages/CommunityPage.tsx` renders it.
+- `SongShelf` gained an optional `notes` map, and `SongCard` an optional `note` line.
+
+**Known limits:**
+- "Listening" is approximated by tags, playlist adds and favorites. Real listens need a source such as Spotify recently-played written to `user_songs` (`listen`), which would then be added to `SIGNAL_WEIGHTS`.
+- Scores are computed per request in Python. Fine at this size; precompute in a periodic job if traffic grows.
+- Existing playlist memberships got the migration time as their `created_at`.
+- After pulling this change, run `python -m db.manager` once and restart the API process.

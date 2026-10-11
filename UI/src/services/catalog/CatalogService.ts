@@ -1,4 +1,11 @@
-import type { SongSearch, TagWrite, UserSong, UserSongList, UserTag } from '../../domain/types'
+import type {
+  CommunityFeed,
+  SongSearch,
+  TagWrite,
+  UserSong,
+  UserSongList,
+  UserTag,
+} from '../../domain/types'
 
 export type DataSourceKind = 'http' | 'mock'
 
@@ -9,4 +16,5 @@ export interface CatalogService {
   getSong(songId: number): Promise<UserSong>
   addTag(songId: number, tag: TagWrite): Promise<UserTag>
   removeTag(songId: number, tag: TagWrite): Promise<void>
+  community(): Promise<CommunityFeed>
 }

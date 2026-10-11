@@ -8,11 +8,12 @@ import styles from './SongCard.module.css'
 interface SongCardProps {
   song: SongSummary
   highlightTokens?: readonly string[]
+  note?: string
 }
 
 const VISIBLE_TAGS = 3
 
-export function SongCard({ song, highlightTokens = [] }: SongCardProps) {
+export function SongCard({ song, highlightTokens = [], note }: SongCardProps) {
   const highlight = new Set(highlightTokens)
   const tags = [...song.tags]
     .filter((tag) => tag.kind !== 'artist')
@@ -26,6 +27,7 @@ export function SongCard({ song, highlightTokens = [] }: SongCardProps) {
         <div className={styles.body}>
           <h3 className={styles.title}>{song.title}</h3>
           <p className={styles.artist}>{song.artist_credit}</p>
+          {note ? <p className={styles.note}>{note}</p> : null}
         </div>
       </Link>
       {tags.length > 0 ? (

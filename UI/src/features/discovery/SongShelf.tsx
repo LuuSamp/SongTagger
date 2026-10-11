@@ -9,10 +9,11 @@ interface SongShelfProps {
   id: string
   eyebrow: string
   title: ReactNode
-  seeAllHref: string
+  seeAllHref?: string
   songs: readonly SongSummary[] | null
   highlightTokens?: readonly string[]
   placeholderCount?: number
+  notes?: ReadonlyMap<number, string>
 }
 
 export function SongShelf({
@@ -23,6 +24,7 @@ export function SongShelf({
   songs,
   highlightTokens,
   placeholderCount = 5,
+  notes,
 }: SongShelfProps) {
   const headingId = `shelf-${id}`
   return (
@@ -32,9 +34,11 @@ export function SongShelf({
           <span className={styles.eyebrow}>{eyebrow}</span>
           {title}
         </h2>
-        <Link to={seeAllHref} className={styles.seeAll}>
-          See all
-        </Link>
+        {seeAllHref ? (
+          <Link to={seeAllHref} className={styles.seeAll}>
+            See all
+          </Link>
+        ) : null}
       </div>
       {songs === null ? (
         <ul className={styles.row} aria-hidden="true">
@@ -52,7 +56,7 @@ export function SongShelf({
         <ul className={styles.row}>
           {songs.map((song) => (
             <li key={song.id}>
-              <SongCard song={song} highlightTokens={highlightTokens} />
+              <SongCard song={song} highlightTokens={highlightTokens} note={notes?.get(song.id)} />
             </li>
           ))}
         </ul>

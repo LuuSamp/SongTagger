@@ -47,7 +47,10 @@ export function SpotifyImportPanel({ initiallyOpen = false }: { initiallyOpen?: 
         setList(
           error instanceof SpotifyNotConnectedError
             ? { kind: 'not-connected' }
-            : { kind: 'error', message: messageOf(error, 'Could not load your Spotify playlists.') },
+            : {
+                kind: 'error',
+                message: messageOf(error, 'Could not load your Spotify playlists.'),
+              },
         ),
     )
     return () => {
@@ -105,8 +108,7 @@ export function SpotifyImportPanel({ initiallyOpen = false }: { initiallyOpen?: 
         <div className={styles.result} role="status">
           <div className={styles.resultHeader}>
             <p>
-              Imported <strong>{result.playlist.name}</strong> with{' '}
-              {result.playlist.songs.length}{' '}
+              Imported <strong>{result.playlist.name}</strong> with {result.playlist.songs.length}{' '}
               {result.playlist.songs.length === 1 ? 'song' : 'songs'}.
             </p>
             <Button variant="ghost" onClick={() => setResult(null)} aria-label="Dismiss">
@@ -159,7 +161,9 @@ export function SpotifyImportPanel({ initiallyOpen = false }: { initiallyOpen?: 
                       onClick={() => handleImport(item)}
                       disabled={importing !== null}
                       aria-busy={busy || undefined}
-                      title={linked ? 'Replace the linked local playlist' : 'Import as a new playlist'}
+                      title={
+                        linked ? 'Replace the linked local playlist' : 'Import as a new playlist'
+                      }
                     >
                       {cover ? (
                         <img className={styles.cover} src={cover} alt="" loading="lazy" />

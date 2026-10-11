@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -108,3 +109,32 @@ class PlaylistSongWrite(BaseModel):
 
 class PlaylistOrder(BaseModel):
     membership_ids: list[int]
+
+
+class ConsensusTag(Tag):
+    people: int
+
+
+class TrendingSong(BaseModel):
+    song: UserSong
+    score: float
+    people: int
+    playlist_adds: int
+    taggers: int
+    likes: int
+    consensus: list[ConsensusTag]
+
+
+class RisingTag(BaseModel):
+    tag: Tag
+    recent: int
+    baseline: float
+    growth: float
+    people: int
+
+
+class CommunityFeed(BaseModel):
+    trending_window: Literal["week", "all_time"]
+    trending: list[TrendingSong]
+    tags_window: Literal["week", "all_time"]
+    rising_tags: list[RisingTag]

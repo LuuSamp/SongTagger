@@ -1,5 +1,5 @@
 import { displayTagName, foldText, normalizeTagName, sortTags, toToken } from '../../domain/tags'
-import type { Song, TagWrite, UserSong, UserTag } from '../../domain/types'
+import type { CommunityFeed, Song, TagKind, TagWrite, UserSong, UserTag } from '../../domain/types'
 import {
   MOCK_CATALOG_USER,
   type FixtureSong,
@@ -160,5 +160,68 @@ export function createMockCatalog(
           ),
       )
     },
+    async community() {
+      await wait(latencyMs)
+      requireUser()
+      return mockCommunity(songs, username)
+    },
   }
+}
+
+const MOCK_TRENDING_LIMIT = 10
+const MOCK_RISING_LIMIT = 8
+
+function mockCommunity(songs: readonly FixtureSong[], username: string): CommunityFeed {
+  const listeners = (fixture: FixtureSong) =>
+    fixture.tags.filter((tag) => tag.appliedBy !== MOCK_CATALOG_USER)
+
+  const perArtist = new Map<string, number>()
+  const trending = [...songs]
+    .map((fixture) => ({ fixture, signals: listeners(fixture) }))
+    .filter(({ signals }) => signals.length > 0)
+    .sort((a, b) => b.signals.length - a.signals.length || a.fixture.id - b.fixture.id)
+    .filter(({ fixture }) => {
+      const count = perArtist.get(fixture.artist_credit) ?? 0
+      perArtist.set(fixture.artist_credit, count + 1)
+      return count < 2
+    })
+    .slice(0, MOCK_TRENDING_LIMIT)
+    .map(({ fixture, signals }) => {
+      const people = new Set(signals.map((tag) => tag.appliedBy)).size
+      const consensus = signals
+        .filter((tag) => tag.kind !== 'artist')
+        .slice(0, 3)
+        .map((tag) => ({ kind: tag.kind, name: tag.name, token: toToken(tag.name), people: 1 }))
+      return {
+        song: toUserSong(fixture, username),
+        score: signals.length,
+        people,
+        playlist_adds: 0,
+        taggers: people,
+        likes: 0,
+        consensus,
+      }
+    })
+
+  const tagCounts = new Map<string, { kind: TagKind; name: string; count: number }>()
+  for (const fixture of songs) {
+    for (const tag of listeners(fixture)) {
+      const key = `${tag.kind}:${normalizeTagName(tag.name)}`
+      const entry = tagCounts.get(key) ?? { kind: tag.kind, name: tag.name, count: 0 }
+      entry.count += 1
+      tagCounts.set(key, entry)
+    }
+  }
+  const risingTags = [...tagCounts.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, MOCK_RISING_LIMIT)
+    .map((entry) => ({
+      tag: { kind: entry.kind, name: entry.name, token: toToken(entry.name) },
+      recent: entry.count,
+      baseline: 0,
+      growth: 1,
+      people: entry.count,
+    }))
+
+  return { trending_window: 'all_time', trending, tags_window: 'all_time', rising_tags: risingTags }
 }

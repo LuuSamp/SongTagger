@@ -134,6 +134,18 @@ CREATE TABLE IF NOT EXISTS playlist_songs (
     CONSTRAINT playlist_songs_song_fk FOREIGN KEY (song_id) REFERENCES songs (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Community trends need to know when a song joined a playlist.
+-- Rows that existed before this column get the time of the migration.
+
+ALTER TABLE playlist_songs
+    ADD COLUMN IF NOT EXISTS created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE playlist_songs
+    ADD KEY IF NOT EXISTS playlist_songs_created (created_at);
+
+ALTER TABLE song_tags
+    ADD KEY IF NOT EXISTS song_tags_created (created_at);
+
 -- One Spotify connection per user. A later connect replaces these three fields.
 -- The Spotify client id stays in the environment, not in this table.
 

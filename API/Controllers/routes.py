@@ -1,4 +1,4 @@
-"""Song, tag, and playlist routes. HTTP only; catalog rules live in services."""
+"""Song, tag, playlist, and community routes. HTTP only; catalog rules live in services."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from fastapi import APIRouter, Response
 from db.manager import CATALOG_USERNAME
 
 from API.Models import (
+    CommunityFeed,
     Playlist,
     PlaylistList,
     PlaylistOrder,
@@ -19,6 +20,7 @@ from API.Models import (
     UserSongList,
     UserTag,
 )
+from API.Services.community import CommunityService
 from API.Services.errors import BadRequest
 from API.Services.playlists import PlaylistService
 from API.Services.search import SearchService
@@ -31,6 +33,7 @@ def build_router(
     songs: SongService,
     tags: TagService,
     playlists: PlaylistService,
+    community: CommunityService,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -45,6 +48,11 @@ def build_router(
     def lookup_user(username: str) -> dict:
         _reject_catalog(username)
         return songs.lookup(username)
+
+    @router.get("/users/{username}/community", response_model=CommunityFeed)
+    def community_feed(username: str) -> dict:
+        _reject_catalog(username)
+        return community.feed(username)
 
     @router.get("/users/{username}/songs", response_model=UserSongList)
     def search_tags(username: str, q: str | None = None) -> dict:
