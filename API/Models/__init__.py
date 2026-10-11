@@ -1,6 +1,8 @@
 """Request and response models."""
 
 from API.Models.schemas import (
+    FavoriteList,
+    FavoriteSong,
     Playlist,
     PlaylistList,
     PlaylistOrder,
@@ -17,6 +19,8 @@ from API.Models.schemas import (
 )
 
 __all__ = [
+    "FavoriteList",
+    "FavoriteSong",
     "Playlist",
     "PlaylistList",
     "PlaylistOrder",

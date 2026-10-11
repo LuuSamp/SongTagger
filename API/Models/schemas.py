@@ -108,3 +108,14 @@ class PlaylistSongWrite(BaseModel):
 
 class PlaylistOrder(BaseModel):
     membership_ids: list[int]
+
+
+class FavoriteSong(BaseModel):
+    song_id: int
+    title: str
+    artist_credit: str
+    favorited_at: datetime
+
+
+class FavoriteList(BaseModel):
+    songs: list[FavoriteSong]
