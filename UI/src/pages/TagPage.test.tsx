@@ -2,16 +2,18 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CatalogContext,
   LibraryContext,
+  RecommendationsContext,
   SessionContext,
   type LibraryActions,
 } from '../app/contexts'
 import { router } from '../app/router'
 import type { FavoriteSong, Playlist } from '../domain/library'
 import type { CatalogService } from '../services/catalog'
+import type { RecommendationService } from '../services/recommendations'
 import type { TagWrite, UserSong, UserTag } from '../domain/types'
 import { TagPage } from './TagPage'
 
@@ -26,7 +28,12 @@ const playlistSong = song(2, 'Playlist Tune', [tag('feeling', 'Bright')])
 
 let root: Root | null = null
 
+beforeEach(() => {
+  vi.spyOn(Math, 'random').mockReturnValue(1 - Number.EPSILON)
+})
+
 afterEach(() => {
+  vi.restoreAllMocks()
   act(() => {
     root?.unmount()
   })
@@ -152,6 +159,35 @@ describe('Tag these songs', () => {
     expect(buttons(view)).not.toContain('Jazz')
   })
 
+  it('places an unsaved recommendation between saved songs', async () => {
+    const unsaved = song(8, 'Unsaved Tune', [tag('feeling', 'Hazy')])
+    const view = await renderQueue({
+      recommendations: [unsaved],
+      songs: [favoriteSong, playlistSong, unsaved],
+    })
+
+    expect(text(view)).toContain('Favorite Tune')
+    await click(view, 'Go to next')
+    expect(text(view)).toContain('Unsaved Tune')
+    expect(text(view)).not.toContain('Favorite Tune')
+    await click(view, 'Go to next')
+    expect(text(view)).toContain('Playlist Tune')
+    expect(text(view)).not.toContain('Unsaved Tune')
+  })
+
+  it('plays recommendations when nothing is saved', async () => {
+    const unsaved = song(8, 'Unsaved Tune', [tag('feeling', 'Hazy')])
+    const view = await renderQueue({
+      favorites: [],
+      playlists: [],
+      songs: [unsaved],
+      recommendations: [unsaved],
+    })
+
+    expect(text(view)).toContain('Unsaved Tune')
+    expect(text(view)).not.toContain('Nothing to tag right now')
+  })
+
   it('shows one short line when the queue is empty', async () => {
     const view = await renderQueue({ favorites: [], playlists: [], songs: [] })
     const message = view.querySelector('[role="status"]')
@@ -240,6 +276,7 @@ interface QueueOptions {
   favorites?: FavoriteSong[]
   playlists?: Playlist[]
   songs?: UserSong[]
+  recommendations?: UserSong[]
   addTag?: CatalogService['addTag']
   favoritesStatus?: LibraryActions['favoritesStatus']
   status?: LibraryActions['status']
@@ -252,6 +289,7 @@ function queueOptions(options: QueueOptions = {}): Required<QueueOptions> {
       playlist([track(2, 'Playlist Tune', 1), track(1, 'Favorite Tune', 2)]),
     ],
     songs: options.songs ?? [favoriteSong, playlistSong],
+    recommendations: options.recommendations ?? [],
     addTag:
       options.addTag ??
       (async (_songId: number, written: TagWrite) => ({
@@ -276,6 +314,17 @@ function renderNow(options: QueueOptions = {}): HTMLElement {
     },
     addTag: resolved.addTag,
   } as CatalogService
+  const recommendations = {
+    kind: 'http',
+    recommend: () =>
+      Promise.resolve({
+        songs: resolved.recommendations.map((entry) => ({
+          song: entry,
+          score: 1,
+          because: [],
+        })),
+      }),
+  } as RecommendationService
   const library = {
     kind: 'http',
     status: resolved.status,
@@ -293,9 +342,11 @@ function renderNow(options: QueueOptions = {}): HTMLElement {
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <SessionContext.Provider value={{ username: 'ada' }}>
           <CatalogContext.Provider value={catalog}>
-            <LibraryContext.Provider value={library}>
-              <TagPage />
-            </LibraryContext.Provider>
+            <RecommendationsContext.Provider value={recommendations}>
+              <LibraryContext.Provider value={library}>
+                <TagPage />
+              </LibraryContext.Provider>
+            </RecommendationsContext.Provider>
           </CatalogContext.Provider>
         </SessionContext.Provider>
       </MemoryRouter>,

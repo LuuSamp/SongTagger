@@ -8,6 +8,7 @@ from db.manager import CATALOG_USERNAME, open_database
 
 from API.Services.errors import BadRequest, NotFound
 from API.Services.songs import SongService
+from API.Services.tag_rank import PLAYLIST_TAG_LIMIT, tags_across, tags_by_song
 
 _POSITION_OFFSET = 1_000_000
 _NAME_LIMIT = 255
@@ -206,8 +207,13 @@ class PlaylistService:
                 }
                 for row in cursor.fetchall()
             ]
+        song_ids = [song["song_id"] for song in songs]
+        by_song = tags_by_song(connection, song_ids)
+        for song in songs:
+            song["tags"] = by_song[song["song_id"]]
         document = _summary(playlist)
         document["songs"] = songs
+        document["tags"] = tags_across(connection, song_ids, limit=PLAYLIST_TAG_LIMIT)
         return document
 
 

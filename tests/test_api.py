@@ -378,6 +378,52 @@ def test_playlist_not_found(client) -> None:
     assert [song["membership_id"] for song in still_there.json()["songs"]] == [membership_id]
 
 
+def test_playlist_tags_rank_by_count_and_skip_duplicate_memberships(client) -> None:
+    ada = insert_user("ada")
+    insert_user("bia")
+    insert_user("cy")
+    song_a = insert_song("Blue in Green", "Miles Davis")
+    song_b = insert_song("So What", "Miles Davis")
+    quiet = insert_song("Untitled", "Nobody")
+    add_tag(song_a, "ada", "genre", "jazz")
+    add_tag(song_a, "bia", "genre", "jazz")
+    add_tag(song_a, "bia", "feeling", "late night")
+    add_tag(song_b, "cy", "genre", "jazz")
+
+    empty_id = client.post(f"/user/{ada}/playlist", json={"name": "Empty"}).json()["id"]
+    empty = client.get(f"/user/{ada}/playlist/{empty_id}")
+    assert empty.status_code == 200
+    assert empty.json()["tags"] == []
+    assert empty.json()["songs"] == []
+
+    playlist_id = client.post(f"/user/{ada}/playlist", json={"name": "Night"}).json()["id"]
+    base = f"/user/{ada}/playlist/{playlist_id}"
+    client.post(f"{base}/song", json={"song_id": song_a})
+    client.post(f"{base}/song", json={"song_id": song_b})
+    client.post(f"{base}/song", json={"song_id": quiet})
+    duplicated = client.post(f"{base}/song", json={"song_id": song_a})
+    assert duplicated.status_code == 200
+    body = duplicated.json()
+
+    jazz = {"kind": "genre", "name": "jazz", "token": "jazz", "count": 3}
+    late_night = {"kind": "feeling", "name": "late night", "token": "late-night", "count": 1}
+    assert body["tags"][:2] == [jazz, late_night]
+
+    song_a_tags = [
+        {"kind": "genre", "name": "jazz", "token": "jazz", "count": 2},
+        {"kind": "feeling", "name": "late night", "token": "late-night", "count": 1},
+    ]
+    memberships = {song["song_id"]: [] for song in body["songs"]}
+    for song in body["songs"]:
+        memberships[song["song_id"]].append(song["tags"])
+    assert memberships[song_a] == [song_a_tags, song_a_tags]
+    assert memberships[song_b] == [[{"kind": "genre", "name": "jazz", "token": "jazz", "count": 1}]]
+    assert memberships[quiet] == [[]]
+
+    listed = client.get(f"/user/{ada}/playlist")
+    assert "tags" not in listed.json()["playlists"][0]
+
+
 def _catalog_user_id() -> int:
     connection = open_database()
     try:

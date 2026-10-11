@@ -10,6 +10,7 @@ from API.Adapters.musicbrainz import RecordingSource
 from API.Adapters.spotify_library import SpotifyImage, SpotifyItem, SpotifyLibrary, SpotifyLibraryError
 from API.Services.errors import BadRequest, UpstreamError
 from API.Services.spotify_auth import SpotifyAuth
+from API.Services.tag_rank import PLAYLIST_TAG_LIMIT, tags_across, tags_by_song
 
 _NAME_LIMIT = 255
 
@@ -281,6 +282,10 @@ def _write_playlist(
             }
             for row in cursor.fetchall()
         ]
+    song_ids = [song["song_id"] for song in songs]
+    by_song = tags_by_song(connection, song_ids)
+    for song in songs:
+        song["tags"] = by_song[song["song_id"]]
     return {
         "id": int(playlist["id"]),
         "name": playlist["name"],
@@ -288,4 +293,5 @@ def _write_playlist(
         "spotify_playlist_id": playlist["spotify_playlist_id"],
         "image_url": playlist["image_url"],
         "songs": songs,
+        "tags": tags_across(connection, song_ids, limit=PLAYLIST_TAG_LIMIT),
     }

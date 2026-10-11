@@ -20,6 +20,10 @@ class Tag(BaseModel):
     token: str
 
 
+class CountedTag(Tag):
+    count: int
+
+
 class UserTag(Tag):
     applied_by_me: bool
 
@@ -80,6 +84,7 @@ class PlaylistSong(BaseModel):
     title: str
     artist_credit: str
     image_url: str | None
+    tags: list[CountedTag]
 
 
 class PlaylistSummary(BaseModel):
@@ -92,6 +97,7 @@ class PlaylistSummary(BaseModel):
 
 class Playlist(PlaylistSummary):
     songs: list[PlaylistSong]
+    tags: list[CountedTag]
 
 
 class PlaylistList(BaseModel):

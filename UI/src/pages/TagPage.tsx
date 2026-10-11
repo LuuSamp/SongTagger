@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { useCatalog, useLibrary } from '../app/contexts'
+import { useCatalog, useLibrary, useRecommendationService } from '../app/contexts'
 import { PageShell } from '../components/layout/PageShell'
 import { Button } from '../components/ui/Button'
 import { StateMessage } from '../components/ui/StateMessage'
@@ -12,9 +12,12 @@ import { AddTagForm } from '../features/tags/AddTagForm'
 import { useTagMutations } from '../hooks/useTagMutations'
 import styles from './TagPage.module.css'
 
+const RECOMMENDATION_LIMIT = 12
+
 export function TagPage() {
   const catalog = useCatalog()
   const library = useLibrary()
+  const recommendations = useRecommendationService()
   const [songs, setSongs] = useState<UserSong[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -36,15 +39,21 @@ export function TagPage() {
     let cancelled = false
     const { favorites, playlists } = libraryRef.current
     const ids = librarySongIds(favorites, playlists)
-    if (ids.length === 0) {
-      setSongs([])
-      setLoadError(null)
-      return
-    }
-    Promise.all(ids.map((id) => catalog.getSong(id))).then(
-      (loaded) => {
+    const known =
+      ids.length === 0
+        ? Promise.resolve([] as UserSong[])
+        : Promise.all(ids.map((id) => catalog.getSong(id)))
+    const picks =
+      recommendations.kind === 'http'
+        ? recommendations
+            .recommend(Math.max(ids.length, RECOMMENDATION_LIMIT))
+            .then((result) => result.songs.map((entry) => entry.song))
+            .catch(() => [] as UserSong[])
+        : Promise.resolve([] as UserSong[])
+    Promise.all([known, picks]).then(
+      ([loaded, fresh]) => {
         if (!cancelled) {
-          setSongs(orderTagSongs(loaded))
+          setSongs(orderTagSongs(loaded, fresh, Math.random))
           setLoadError(null)
         }
       },
@@ -58,7 +67,7 @@ export function TagPage() {
     return () => {
       cancelled = true
     }
-  }, [ready, attempt, catalog])
+  }, [ready, attempt, catalog, recommendations])
 
   const song = songs?.[0] ?? null
   const update = useCallback((change: (current: UserSong) => UserSong) => {
