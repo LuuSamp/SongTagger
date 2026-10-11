@@ -1,4 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef } from 'react'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 import {
   MAX_NOTES,
   MAX_NOTES_COMPACT,
@@ -17,21 +18,10 @@ import {
 } from './windField'
 import styles from './WindLayer.module.css'
 
-const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 const COMPACT_WIDTH = 640
 const NOTE_ALPHA = [0.42, 0.38, 0.32]
 const STREAK_ALPHA = 0.12
 const MAX_DT = 1 / 30
-
-function subscribeReducedMotion(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_MOTION)
-  query.addEventListener('change', onChange)
-  return () => query.removeEventListener('change', onChange)
-}
-
-function prefersReducedMotion() {
-  return window.matchMedia(REDUCED_MOTION).matches
-}
 
 function readColors(element: Element) {
   const styles = getComputedStyle(element)
@@ -111,11 +101,7 @@ function drawStreak(context: CanvasRenderingContext2D, streak: Streak, color: st
 }
 
 export function WindLayer() {
-  const reduceMotion = useSyncExternalStore(
-    subscribeReducedMotion,
-    prefersReducedMotion,
-    () => true,
-  )
+  const reduceMotion = useReducedMotion()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {

@@ -338,3 +338,26 @@ The `catalog` user is always excluded, and each person counts once per song and 
 **Limits:**
 - What plays depends on each provider. Spotify plays a 30s preview unless the visitor is logged in to Spotify in the browser. Apple Music plays a preview unless signed in. YouTube plays the full video.
 - No API call is involved, and listens are not recorded. A `listen` signal for Community would need the provider's playback events, which the embeds do not expose to the page.
+
+
+## "Now playing" animation (song page)
+
+While a song is actually playing in the cover player, the scene reacts in both shape and light.
+
+- **Sun** (`components/layout/OrganicBackdrop.tsx`):
+  - **Rays:** they stretch and shrink along their own direction like equaliser bars (1–1.7×, three interleaved rhythms) and light up one after another.
+  - **Core:** it beats at about 100 BPM and gains a warm halo.
+  - **Rotation:** the whole sun slowly turns, one revolution in 40s. When playback stops, the rotation pauses where it is instead of snapping back.
+- **Divider waves** (`features/songs/PlaybackWave.tsx`, shapes from `features/songs/wavePath.ts`): the two lines morph between generated waveforms with SVG `<animate attributeName="d">`, crossing each other. The accent line keeps its glow.
+- **Organic side shapes:** they breathe by morphing between their outline and a swollen variant (5–7s) while slightly warming up.
+
+**When nothing is playing:** no `data-playing` attribute and no `<animate>` elements, so the scene is exactly as before.
+
+**Reduced motion** (`hooks/useReducedMotion.ts`, now shared with `WindLayer`): no shape animation at all, only a steady lit state.
+
+**How "playing" is detected** (`features/songs/embedPlayers.tsx`, parsers in `domain/playback.ts`):
+- **Spotify:** the official iFrame API (`open.spotify.com/embed/iframe-api/v1`), loaded on demand the first time a Spotify player opens. `playback_update` drives the state. If the script fails, it falls back to the plain embed without the light.
+- **YouTube:** the embed URL gets `enablejsapi=1&origin=…`, and the page sends the `listening` handshake. `infoDelivery` / `onStateChange` messages are accepted only from `youtube-nocookie.com` and from that exact iframe.
+- **Apple Music:** no public playback events exist, so focusing or clicking into the Apple player is treated as "playing" until it is closed or switched. **This is a heuristic.** Pausing inside the Apple player does not turn the light off.
+
+Closing the player, switching provider or leaving the page always turns the light off.

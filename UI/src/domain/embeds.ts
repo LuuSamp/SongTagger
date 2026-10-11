@@ -4,6 +4,7 @@ export type EmbedProvider = 'spotify' | 'youtube' | 'apple_music'
 
 export interface Embed {
   provider: EmbedProvider
+  id: string
   label: string
   src: string
   height: number | null
@@ -21,6 +22,7 @@ export function embedFor(source: Source): Embed | null {
   if (source.name === 'spotify' && SPOTIFY_ID.test(id)) {
     return {
       provider: 'spotify',
+      id,
       label: 'Spotify',
       src: `https://open.spotify.com/embed/track/${id}?utm_source=songtagger`,
       height: 352,
@@ -29,6 +31,7 @@ export function embedFor(source: Source): Embed | null {
   if (source.name === 'youtube' && YOUTUBE_ID.test(id)) {
     return {
       provider: 'youtube',
+      id,
       label: 'YouTube',
       src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
       height: null,
@@ -38,6 +41,7 @@ export function embedFor(source: Source): Embed | null {
     const storefront = APPLE_STOREFRONT.exec(source.url)?.[1]?.toLowerCase() ?? 'us'
     return {
       provider: 'apple_music',
+      id,
       label: 'Apple Music',
       src: `https://embed.music.apple.com/${storefront}/song/${id}`,
       height: 175,

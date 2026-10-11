@@ -10,15 +10,23 @@ import {
 import { embeddableSources, type EmbedProvider } from '../../domain/embeds'
 import type { CatalogSong } from '../../domain/types'
 import { SongArtwork } from './SongArtwork'
+import { AppleEmbed, SpotifyEmbed, YouTubeEmbed } from './embedPlayers'
 import { SourceIcon } from './SourceIcon'
 import styles from './CoverPlayer.module.css'
+
+const PLAYERS = {
+  spotify: SpotifyEmbed,
+  youtube: YouTubeEmbed,
+  apple_music: AppleEmbed,
+} as const
 
 interface CoverPlayerProps {
   song: CatalogSong
   children?: ReactNode
+  onPlayingChange?: (playing: boolean) => void
 }
 
-export function CoverPlayer({ song, children }: CoverPlayerProps) {
+export function CoverPlayer({ song, children, onPlayingChange }: CoverPlayerProps) {
   const embeds = useMemo(() => embeddableSources(song.sources), [song.sources])
   const [open, setOpen] = useState(false)
   const [provider, setProvider] = useState<EmbedProvider | null>(null)
@@ -27,6 +35,8 @@ export function CoverPlayer({ song, children }: CoverPlayerProps) {
   const wasOpen = useRef(false)
 
   const active = embeds.find((embed) => embed.provider === provider) ?? embeds[0] ?? null
+
+  useEffect(() => () => onPlayingChange?.(false), [onPlayingChange])
 
   useEffect(() => {
     if (open) {
@@ -40,36 +50,50 @@ export function CoverPlayer({ song, children }: CoverPlayerProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
       event.preventDefault()
+      onPlayingChange?.(false)
       setOpen(false)
     }
   }
 
+  const handlePlayingChange = (playing: boolean) => onPlayingChange?.(playing)
+
+  function close() {
+    onPlayingChange?.(false)
+    setOpen(false)
+  }
+
+  function choose(next: EmbedProvider) {
+    if (next !== active?.provider) {
+      onPlayingChange?.(false)
+    }
+    setProvider(next)
+  }
+
   if (open && active) {
+    const Player = PLAYERS[active.provider]
     return (
       <div className={styles.frame} onKeyDown={handleKeyDown}>
         <div className={styles.backdrop} aria-hidden="true">
           <SongArtwork song={song} variant="tile" />
         </div>
-        <iframe
+        <Player
           key={active.src}
+          embed={active}
+          title={`${song.title} by ${song.artist_credit} on ${active.label}`}
           className={active.height ? styles.iframeFixed : styles.iframeVideo}
           style={
             active.height
               ? ({ '--embed-height': `${active.height}px` } as CSSProperties)
               : undefined
           }
-          src={active.src}
-          title={`${song.title} by ${song.artist_credit} on ${active.label}`}
-          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
+          onPlayingChange={handlePlayingChange}
         />
         <div className={styles.controls}>
           <button
             ref={closeRef}
             type="button"
             className={styles.glass}
-            onClick={() => setOpen(false)}
+            onClick={close}
             aria-label="Close the player and show the cover"
             title="Close player"
           >
@@ -91,7 +115,7 @@ export function CoverPlayer({ song, children }: CoverPlayerProps) {
                   role="radio"
                   aria-checked={embed.provider === active.provider}
                   className={styles.glass}
-                  onClick={() => setProvider(embed.provider)}
+                  onClick={() => choose(embed.provider)}
                   aria-label={`Play on ${embed.label}`}
                   title={embed.label}
                 >

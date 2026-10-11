@@ -23,6 +23,7 @@
 
 .sun {
   position: absolute;
+  overflow: visible;
   top: var(--space-6);
   right: max(var(--layout-gutter), calc((100vw - var(--layout-max)) / 2 - 40px));
   width: 110px;
@@ -37,5 +38,123 @@
 
   .right {
     opacity: 0.6;
+  }
+}
+
+.sunSpin {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+  animation: sun-turn 40s linear infinite;
+  animation-play-state: paused;
+}
+
+.ray {
+  transform-box: view-box;
+  transform-origin: var(--ox) var(--oy);
+}
+
+.core {
+  transform-box: view-box;
+  transform-origin: 60px 60px;
+}
+
+[data-playing] .sunSpin {
+  animation-play-state: running;
+}
+
+[data-playing] .core {
+  animation:
+    sun-glow 2.4s ease-in-out infinite,
+    core-beat 0.6s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+}
+
+[data-playing] .ray {
+  animation:
+    ray-stretch calc(0.9s + var(--rhythm) * 0.2s) ease-in-out calc(var(--ray) * -0.13s) infinite,
+    ray-light 1.2s linear calc(var(--ray) * 0.1s) infinite;
+}
+
+[data-playing] .shape {
+  animation: room-light 6s ease-in-out var(--shape-delay, 0s) infinite;
+}
+
+@keyframes sun-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes core-beat {
+  0%,
+  100% {
+    scale: 1;
+  }
+  18% {
+    scale: 1.09;
+  }
+  45% {
+    scale: 0.98;
+  }
+}
+
+@keyframes ray-stretch {
+  0%,
+  100% {
+    transform: rotate(var(--angle)) scaleX(1) rotate(calc(var(--angle) * -1));
+  }
+  50% {
+    transform: rotate(var(--angle)) scaleX(1.7) rotate(calc(var(--angle) * -1));
+  }
+}
+
+@keyframes sun-glow {
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 3px rgb(240 194 123 / 60%));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgb(240 194 123 / 90%))
+      drop-shadow(0 0 22px rgb(240 194 123 / 55%));
+  }
+}
+
+@keyframes ray-light {
+  0%,
+  55%,
+  100% {
+    opacity: 0.45;
+  }
+  12% {
+    opacity: 1;
+  }
+}
+
+@keyframes room-light {
+  0%,
+  100% {
+    opacity: var(--rest);
+  }
+  50% {
+    opacity: calc(var(--rest) + 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sunSpin,
+  [data-playing] .core,
+  [data-playing] .ray,
+  [data-playing] .shape {
+    animation: none;
+  }
+
+  [data-playing] .core {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgb(240 194 123 / 85%));
+  }
+
+  [data-playing] .ray {
+    opacity: 1;
   }
 }

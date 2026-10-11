@@ -143,6 +143,53 @@
   stroke-width: 1.2;
 }
 
+.wave {
+  overflow: visible;
+}
+
+.wave[data-playing] path:first-child {
+  animation: wave-lead 1.6s ease-in-out infinite;
+}
+
+.wave[data-playing] path:last-child {
+  animation: wave-follow 1.6s ease-in-out infinite;
+}
+
+@keyframes wave-lead {
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgb(196 106 78 / 75%));
+  }
+  50% {
+    opacity: 0.45;
+    filter: none;
+  }
+}
+
+@keyframes wave-follow {
+  0%,
+  100% {
+    opacity: 0.45;
+    filter: none;
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgb(233 201 163 / 90%));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave[data-playing] path:first-child,
+  .wave[data-playing] path:last-child {
+    animation: none;
+  }
+
+  .wave[data-playing] path:first-child {
+    filter: drop-shadow(0 0 4px rgb(196 106 78 / 75%));
+  }
+}
+
 .about {
   display: grid;
   gap: var(--space-3);

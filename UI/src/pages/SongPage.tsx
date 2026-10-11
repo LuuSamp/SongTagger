@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { APP_PATHS, parseSongId } from '../app/routes'
 import { OrganicBackdrop } from '../components/layout/OrganicBackdrop'
@@ -11,6 +12,7 @@ import { AddToPlaylist } from '../features/library/AddToPlaylist'
 import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
 import { CoverPlayer } from '../features/songs/CoverPlayer'
+import { PlaybackWave } from '../features/songs/PlaybackWave'
 import { SourceLinks } from '../features/songs/SourceLinks'
 import { SongTagsPanel } from '../features/tags/SongTagsPanel'
 import { useSong } from '../hooks/useSong'
@@ -22,6 +24,7 @@ export function SongPage() {
   const { songId: rawId } = useParams()
   const songId = parseSongId(rawId)
   const { state, setData, reload } = useSong(songId)
+  const [playing, setPlaying] = useState(false)
 
   if (
     songId === null ||
@@ -60,12 +63,19 @@ export function SongPage() {
   }
 
   return (
-    <PageShell backdrop={<OrganicBackdrop />}>
+    <PageShell backdrop={<OrganicBackdrop playing={playing} />}>
       <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
         <Link to={APP_PATHS.discover}>← Discovery</Link>
       </nav>
       {state.data && state.data.id === songId ? (
-        <SongDetail key={state.data.id} song={state.data} update={setData} reload={reload} />
+        <SongDetail
+          key={state.data.id}
+          song={state.data}
+          update={setData}
+          reload={reload}
+          playing={playing}
+          onPlayingChange={setPlaying}
+        />
       ) : (
         <SongDetailSkeleton />
       )}
@@ -77,9 +87,11 @@ interface SongDetailProps {
   song: UserSong
   update: (change: (song: UserSong) => UserSong) => void
   reload: () => void
+  playing: boolean
+  onPlayingChange: (playing: boolean) => void
 }
 
-function SongDetail({ song, update, reload }: SongDetailProps) {
+function SongDetail({ song, update, reload, playing, onPlayingChange }: SongDetailProps) {
   const tagging = useTagMutations({ songId: song.id, update, reload })
   const duration = formatDuration(song.duration_ms)
   const listenOn = listeningSources(song.sources)
@@ -89,7 +101,7 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
     <article className={styles.layout}>
       <div className={styles.primary}>
         <div className={styles.cover}>
-          <CoverPlayer song={song}>
+          <CoverPlayer song={song} onPlayingChange={onPlayingChange}>
             <p className={styles.artTitle}>{song.title}</p>
             <p className={styles.artArtist}>{song.artist_credit}</p>
             {song.disambiguation ? <p className={styles.artMeta}>{song.disambiguation}</p> : null}
@@ -117,15 +129,7 @@ function SongDetail({ song, update, reload }: SongDetailProps) {
         <SourceLinks label="Listen on:" sources={listenOn} />
 
         <div className={styles.more}>
-          <svg
-            className={styles.wave}
-            viewBox="0 0 400 40"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <path d="M0 22 C 40 6, 70 36, 110 20 S 180 6, 220 22 S 300 38, 340 18 S 390 12, 400 20" />
-            <path d="M0 26 C 50 14, 80 34, 120 24 S 190 12, 230 26 S 310 34, 350 22 S 392 18, 400 24" />
-          </svg>
+          <PlaybackWave className={styles.wave} playing={playing} />
 
           <section className={styles.about} aria-labelledby="about-title">
             <h2 id="about-title" className={styles.sectionTitle}>
