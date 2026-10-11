@@ -138,3 +138,14 @@ class CommunityFeed(BaseModel):
     trending: list[TrendingSong]
     tags_window: Literal["week", "all_time"]
     rising_tags: list[RisingTag]
+
+
+class FavoriteSong(BaseModel):
+    song_id: int
+    title: str
+    artist_credit: str
+    favorited_at: datetime
+
+
+class FavoriteList(BaseModel):
+    songs: list[FavoriteSong]

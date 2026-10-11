@@ -1,6 +1,6 @@
 # SongTagger UI: implementation record and remaining work
 
-This document covers the React frontend in `UI/` as of 2026-10-10, third iteration. The Library is now backed by the real playlist API, favorites are pending, and demo data lives in MariaDB. It describes what exists, what is still mocked, and what is left before production.
+This document covers the React frontend in `UI/` as of 2026-10-10, third iteration. The Library is now backed by the real playlist API and the favorites API, and demo data lives in MariaDB. It describes what exists, what is still mocked, and what is left before production.
 
 Status legend used throughout:
 
@@ -182,8 +182,8 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 
 ## D. Remaining implementation work and known issues
 
-### Favorites: frontend ready, waiting for the API
-The frontend is complete and switches on by itself once the backend exposes this contract. It follows the playlist routes' style and stores rows in `user_songs` with `action = 'like'`:
+### Favorites
+The song-page heart and the Library Favorites tab use this contract. Likes are `user_songs` rows with `action = 'like'`:
 
 | Method | Path | Body | Response |
 |---|---|---|---|
@@ -194,20 +194,17 @@ The frontend is complete and switches on by itself once the backend exposes this
 - **`FavoriteSong`:** `{ song_id: int, title: str, artist_credit: str, favorited_at: datetime }`. Mirrored in `UI/src/domain/library.ts`.
 - **Errors:** `{detail}`, with 404 `"unknown user"` / `"unknown song"` and 400 for `catalog`, as in the playlist routes.
 
-**How the UI detects it** (`services/library/httpLibrary.ts`): when a favorites call answers with FastAPI's route-missing 404 (`{"detail": "Not Found"}`), it raises `FavoritesUnsupportedError` and the favorites status becomes `unsupported`. Any other error is shown as a real error. The browser console therefore logs one expected 404 for `/api/user/{id}/favorite` per page load until the routes exist.
+**How the UI detects a missing route** (`services/library/httpLibrary.ts`): a favorites call that answers with FastAPI's route-missing 404 (`{"detail": "Not Found"}`) raises `FavoritesUnsupportedError` and the favorites status becomes `unsupported`. Any other error is shown as a real error. With the routes in place, that 404 no longer happens on page load.
 
-**What the site shows now (`unsupported`):**
-- On the song page, the heart button is dashed and muted (`aria-disabled`). Clicking it shows "Favorites are coming soon. The API does not have favorites endpoints yet."
-- The Library "Favorites" tab explains the feature is planned and names the endpoints.
-
-**What turns on automatically once the routes exist:**
-- The heart becomes an `aria-pressed` toggle. It updates on screen immediately, with a short pop animation, and rolls back with an inline error if the API fails (`app/useFavoritesState.ts`).
+**What the site does:**
+- The heart is an `aria-pressed` toggle. It updates on screen immediately, with a short pop animation, and rolls back with an inline error if the API fails (`app/useFavoritesState.ts`).
 - The Library Favorites tab lists favorites with `SongGrid`, with an empty state when there are none.
 - Discovery's "For you" samples favorites first, then playlist songs, and excludes them from the shelves.
 
 **Status:**
-- Frontend: implemented. Verified against the real API in the `unsupported` state, and against a simulated version of this contract inside the Playwright test (toggle on and off, the Library list, rollback on a 500).
-- Backend: not implemented; it is yours to build.
+- Frontend: implemented. No frontend change was required for the routes.
+- Backend: implemented. `FavoriteService` reads and writes only `action = 'like'` on the existing `user_songs` table.
+- Verified: `python -m pytest tests` from the SongTagger root passed (102 tests). Against the local API with `VITE_DATA_SOURCE=http` and acting user `user`, the heart on Bohemian Rhapsody toggled on, Library → Favorites listed that song, and unfavoriting returned the empty state.
 
 ### API gaps and inconsistencies found while integrating
 1. **Mixed user addressing.** Catalog routes use `/users/{username}`, while playlist routes use `/user/{user_id}` (singular, numeric). The frontend has to call `GET /users/{username}` first and cache the id. Unifying the routes would remove that round trip.
@@ -235,7 +232,7 @@ The frontend is complete and switches on by itself once the backend exposes this
 
 ## E. Integration roadmap (priority order)
 
-1. **Favorites API** (`user_songs` like), then the frontend work listed in D.
+1. **Favorites API** (`user_songs` like) is done. The heart and Library Favorites tab already call it. Next is the rest of this list.
 2. **Fix hyphenated tag search** in the API and seed normalization.
 3. **Unify user addressing** and add `song_count` (and preview song ids) to playlist summaries.
 4. **Include tags in `PlaylistSong`** or add a batch song endpoint, then simplify `usePlaylistSongs`.
@@ -260,9 +257,10 @@ The frontend is complete and switches on by itself once the backend exposes this
 - **Tagging:** adding "Garoa Fina" to Sampa stores it with that capitalization, and removing it deletes the row.
 - **Unknown song:** `/songs/999999` shows the not-found state.
 - **Health checks:** no console errors other than the expected 404, and no horizontal overflow on mobile.
-- **Favorites, real API (routes missing):**
-  - The heart shows as unavailable, and clicking it shows the "coming soon" note.
-  - The Library Favorites tab explains what is missing.
+- **Favorites, real API:**
+  - On Bohemian Rhapsody, the heart toggles from "Add … to favorites" to pressed "Remove … from favorites".
+  - Library → Favorites lists Bohemian Rhapsody / Queen.
+  - Unfavoriting releases the heart, and the Favorites tab shows "No favorites yet".
 - **Favorites, simulated contract** (Playwright `page.route`, test-only):
   - Favoriting Teardrop presses the heart, and the song appears in Library → Favorites.
   - Unfavoriting releases it.

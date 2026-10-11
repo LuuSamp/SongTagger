@@ -1,4 +1,4 @@
-"""Song, tag, playlist, and community routes. HTTP only; catalog rules live in services."""
+"""Song, tag, playlist, favorite, and community routes. HTTP only; catalog rules live in services."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from db.manager import CATALOG_USERNAME
 
 from API.Models import (
     CommunityFeed,
+    FavoriteList,
+    FavoriteSong,
     Playlist,
     PlaylistList,
     PlaylistOrder,
@@ -22,6 +24,7 @@ from API.Models import (
 )
 from API.Services.community import CommunityService
 from API.Services.errors import BadRequest
+from API.Services.favorites import FavoriteService
 from API.Services.playlists import PlaylistService
 from API.Services.search import SearchService
 from API.Services.songs import SongService
@@ -34,6 +37,7 @@ def build_router(
     tags: TagService,
     playlists: PlaylistService,
     community: CommunityService,
+    favorites: FavoriteService,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -114,6 +118,19 @@ def build_router(
     @router.put("/user/{user_id}/playlist/{playlist_id}/order", response_model=Playlist)
     def reorder_playlist(user_id: int, playlist_id: int, body: PlaylistOrder) -> dict:
         return playlists.reorder(user_id, playlist_id, body.membership_ids)
+
+    @router.get("/user/{user_id}/favorite", response_model=FavoriteList)
+    def list_favorites(user_id: int) -> dict:
+        return favorites.list_favorites(user_id)
+
+    @router.put("/user/{user_id}/favorite/{song_id}", response_model=FavoriteSong)
+    def add_favorite(user_id: int, song_id: int) -> dict:
+        return favorites.add(user_id, song_id)
+
+    @router.delete("/user/{user_id}/favorite/{song_id}", status_code=204, response_model=None)
+    def remove_favorite(user_id: int, song_id: int) -> Response:
+        favorites.remove(user_id, song_id)
+        return Response(status_code=204)
 
     return router
 
