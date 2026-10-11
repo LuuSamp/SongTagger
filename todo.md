@@ -460,3 +460,75 @@ The song page picks one of seven "scenes" from the song's real tags. Only the mo
 - No overflow and no console errors.
 
 **Not done:** dark mode does not exist in the app yet, so scenes were designed for the light canvas only.
+
+## "Tag these songs" page layout
+
+`/tag` (`UI/src/pages/TagPage.tsx`) keeps the queue logic from the minigame commit and only changes how the page explains and lays out the work.
+
+**Header:**
+- The title sits on one line, with one sentence of purpose: "Songs from your favorites and playlists. Confirm what you hear and help others find them."
+- A progress readout ("Song 3 of 15") with a thin bar, counted from the queue size at load.
+
+**From 900 px, two columns:**
+- **Left:** the cover player, sticky while scrolling.
+- **Right:** three numbered steps in an `<ol>`. The labels are paragraphs, not headings, so the `h1` stays the only heading as the existing tests require.
+  1. **Listen.**
+  2. **Pick what fits:** the suggestions are light sentence-case toggles (a page-local button, not the shared `TagChip`), in rows labelled Feeling and Instrument. Each shows "+", which becomes a check, and takes its kind colour (`--tag-feeling` / `--tag-instrument`) only when selected. Below 520 px the label sits above its row. A song with no suggestions says "No suggestions yet. Add your own below."
+  3. **Add what's missing:** the same `AddTagForm`, with a note that these save right away.
+- **Action row:** a live summary ("2 tags will be saved when you go to next." or "Nothing selected. Go to next skips this song.") and the "Go to next" button.
+
+**Under 900 px:**
+- The cover shrinks to 15 rem.
+- The action row sticks to the bottom of the screen, so "Go to next" is always reachable.
+
+**Unchanged:** queue order, selection staging, saving on "Go to next", own tags saving immediately, and the empty and error states.
+
+**Live queue:** the queue follows the library while the page is open.
+- A song newly liked or added to a playlist is fetched and placed right after the current song.
+- A waiting song that leaves the library is dropped. The song on screen always stays.
+- When the window regains focus or the tab becomes visible, the page reloads favorites and playlists, so likes made in another tab show up.
+- Progress is "done + remaining", so it stays consistent as the queue changes.
+- Songs already passed in this visit never come back.
+- Verified in Chrome against the real API: a like made outside the page moved the queue from 1 of 15 to 1 of 16 on focus, and that song came up next. The like was then removed.
+
+**Tests:** `TagPage.test.tsx` has 19 tests (12 original + 7 new): progress, grouping, the selection summary, the no-suggestions message, a new like joining the queue, a removed song leaving it, and the reload on focus.
+
+**Verified in Chrome against the real API:**
+- At 1440×900 and 1280×720 the title is on one line, there is no horizontal overflow, and "Go to next" is visible without scrolling.
+- At 390×844 the first screen shows the first step and the sticky "Go to next".
+- "Go to next" with nothing selected advanced the progress from 1 to 2 of 15.
+- The grouped chips could not be checked in the browser because none of ada's queued songs has pending suggestions right now; the unit tests cover them.
+
+**Open issues found while checking:**
+- **Phone overflow:** since the "Tag these songs" nav item was added, `AppNavBar` overflows phone widths by about 34 px on every page (the search field and avatar run past the edge). It needs a shorter label or a scrollable nav on small screens.
+- **`happy-dom`:** it is declared in `UI/package.json` but was not installed. `npm install` fixes it; there is no lockfile in `UI/`.
+- **Formatting:** `npm run format:check` flags seven files from the minigame commit (`router.tsx`, `routes.ts`, `AppNavBar.tsx`, `TagChip.tsx`, `TagChip.module.css`, `tagQueue.ts` and `CommunityPage.test.tsx`).
+
+## Library › Favorites search
+
+The Favorites tab (`UI/src/pages/LibraryPage.tsx`, `Favorites`) has the same search bar as Discovery: the `SearchPanel` component, with the Tags / Title tabs, active tag chips, Clear, and the "Try / Narrow it down" suggestions.
+
+**Scope:** it searches only your favorites, in the browser, and never imports anything.
+- The full songs, with tags, come from `usePlaylistSongs(favoriteIds)`, one request per favorite.
+- **Tags:** keeps favorites that have every chosen tag. Matching uses normalized tokens (`toToken`), so hyphenated genres work here.
+- **Title:** keeps favorites whose title contains the text, and whose artist contains the artist text when given, ignoring case and accents (`foldText`).
+- **Suggestions:** the most common non-artist tags among your favorites. With a tag active, they come only from the matching songs, so "Narrow it down" always leads to results.
+
+**Interface:**
+- The search lives in the URL (`/library?tab=favorites&tags=jazz+late-night`, or `&title=…&artist=…`) through `libraryPath(tab, playlistId, search)`, which shares its writer with `discoverPath`. Switching tabs clears it.
+- A status line reads "N of M favorites match".
+- No match shows "No favorites match" with a Clear search button. If the tags fail to load, the page explains it and offers a retry.
+
+**`SearchPanel` changes:** two optional props, `suggestions` and `titleNote`. Without them, Discovery is unchanged (verified).
+
+**Code and tests:**
+- Logic: `domain/favoritesSearch.ts` (`filterSongs`, `topTags`).
+- Tests: `favoritesSearch.test.ts` and `app/routes.test.ts`.
+
+**Verified in Chrome against the real API (ada, 5 favorites):**
+- The "electronic" suggestion gave 3 of 5 and wrote `tags=electronic` to the URL.
+- Every narrow-down suggestion gave 2 or 3 results.
+- An impossible tag showed the empty state, and Clear restored all 5.
+- The title "sampa" gave 1 of 5.
+- At 390 px the content fits; the shared nav overflow noted above remains.
+- No console errors.

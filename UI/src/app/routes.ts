@@ -11,11 +11,7 @@ export const APP_PATHS = {
 
 export type DiscoverQuery = { tags: string[] } | { title: string; artist?: string }
 
-export function discoverPath(query?: DiscoverQuery): string {
-  if (!query) {
-    return APP_PATHS.discover
-  }
-  const params = new URLSearchParams()
+function writeQuery(params: URLSearchParams, query: DiscoverQuery) {
   if ('tags' in query) {
     params.set('tags', query.tags.join(' '))
   } else {
@@ -24,6 +20,14 @@ export function discoverPath(query?: DiscoverQuery): string {
       params.set('artist', query.artist)
     }
   }
+}
+
+export function discoverPath(query?: DiscoverQuery): string {
+  if (!query) {
+    return APP_PATHS.discover
+  }
+  const params = new URLSearchParams()
+  writeQuery(params, query)
   return `${APP_PATHS.discover}?${params.toString()}`
 }
 
@@ -46,13 +50,20 @@ export function parseSongId(value: string | undefined): number | null {
 
 export type LibraryTab = 'favorites' | 'playlists'
 
-export function libraryPath(tab: LibraryTab = 'playlists', playlistId?: number): string {
+export function libraryPath(
+  tab: LibraryTab = 'playlists',
+  playlistId?: number,
+  search?: DiscoverQuery,
+): string {
   const params = new URLSearchParams()
   if (tab !== 'playlists') {
     params.set('tab', tab)
   }
   if (playlistId !== undefined) {
     params.set('playlist', String(playlistId))
+  }
+  if (search) {
+    writeQuery(params, search)
   }
   const query = params.toString()
   return query ? `${APP_PATHS.library}?${query}` : APP_PATHS.library

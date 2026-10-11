@@ -31,6 +31,8 @@ interface SearchPanelProps {
   query: SongQuery
   onSearch: (query: DiscoverQuery | undefined) => void
   inputId: string
+  suggestions?: readonly string[]
+  titleNote?: string
 }
 
 function ArrowIcon() {
@@ -67,7 +69,13 @@ function readable(token: string): string {
   return token.replace(/-/g, ' ')
 }
 
-export function SearchPanel({ query, onSearch, inputId }: SearchPanelProps) {
+export function SearchPanel({
+  query,
+  onSearch,
+  inputId,
+  suggestions: suggestionPool = SUGGESTION_POOL,
+  titleNote,
+}: SearchPanelProps) {
   const [mode, setMode] = useState<SearchMode>(query?.mode ?? 'tags')
   const [draft, setDraft] = useState('')
   const [title, setTitle] = useState(query?.mode === 'title' ? query.title : '')
@@ -89,8 +97,8 @@ export function SearchPanel({ query, onSearch, inputId }: SearchPanelProps) {
 
   const suggestions = useMemo(
     () =>
-      SUGGESTION_POOL.filter((token) => !activeTokens.includes(token)).slice(0, SUGGESTION_LIMIT),
-    [activeTokens],
+      suggestionPool.filter((token) => !activeTokens.includes(token)).slice(0, SUGGESTION_LIMIT),
+    [activeTokens, suggestionPool],
   )
 
   function searchTags(tokens: string[]) {
@@ -297,8 +305,8 @@ export function SearchPanel({ query, onSearch, inputId }: SearchPanelProps) {
               </span>
             </form>
             <p id={noteId} className={styles.hint}>
-              Matches the exact title. Songs missing from the catalog are imported from MusicBrainz,
-              which can take a few seconds.
+              {titleNote ??
+                'Matches the exact title. Songs missing from the catalog are imported from MusicBrainz, which can take a few seconds.'}
             </p>
           </>
         )}

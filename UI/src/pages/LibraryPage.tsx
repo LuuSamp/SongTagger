@@ -1,22 +1,33 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLibrary } from '../app/contexts'
-import { APP_PATHS, libraryPath, type LibraryTab } from '../app/routes'
+import {
+  APP_PATHS,
+  libraryPath,
+  songQueryFromParams,
+  type DiscoverQuery,
+  type LibraryTab,
+} from '../app/routes'
 import { PageShell } from '../components/layout/PageShell'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Skeleton } from '../components/ui/Skeleton'
 import { StateMessage } from '../components/ui/StateMessage'
-import { favoriteSongSummary, type Playlist } from '../domain/library'
+import { filterSongs, topTags } from '../domain/favoritesSearch'
+import { favoriteSongSummary, type Playlist, type SongSummary } from '../domain/library'
+import { SearchPanel } from '../features/discovery/SearchPanel'
 import { PlaylistCard } from '../features/library/PlaylistCard'
 import { PlaylistTrackList } from '../features/library/PlaylistTrackList'
 import { SpotifyExportButton, SpotifyExportStatus } from '../features/library/SpotifyExportButton'
 import { SpotifyImportPanel } from '../features/library/SpotifyImportPanel'
 import { SongGrid, SongGridSkeleton } from '../features/songs/SongGrid'
+import { usePlaylistSongs } from '../hooks/usePlaylistSongs'
 import { useSpotifyExport } from '../hooks/useSpotifyExport'
 import styles from './LibraryPage.module.css'
 
 const NAME_LIMIT = 255
+const FAVORITES_SEARCH_ID = 'favorites-search'
+const SUGGESTION_POOL_SIZE = 24
 
 const TABS = [
   { value: 'playlists' as const, label: 'Playlists' },
@@ -85,6 +96,24 @@ export function LibraryPage() {
 
 function Favorites() {
   const { favoritesStatus, favoritesError, favorites, reloadFavorites } = useLibrary()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const paramsKey = params.toString()
+  const query = useMemo(() => songQueryFromParams(new URLSearchParams(paramsKey)), [paramsKey])
+  const favoriteIds = useMemo(() => favorites.map((song) => song.song_id), [favorites])
+  const detailed = usePlaylistSongs(favoriteIds)
+  const tagged = detailed.state.data
+  const suggestions = useMemo(() => {
+    if (!tagged) {
+      return []
+    }
+    const narrowed = query?.mode === 'tags' ? filterSongs(tagged, query) : tagged
+    return topTags(narrowed, SUGGESTION_POOL_SIZE)
+  }, [tagged, query])
+
+  function search(next: DiscoverQuery | undefined) {
+    navigate(libraryPath('favorites', undefined, next))
+  }
 
   if (favoritesStatus === 'unsupported' || favoritesStatus === 'unavailable') {
     return (
@@ -132,7 +161,70 @@ function Favorites() {
     )
   }
 
-  return <SongGrid songs={favorites.map(favoriteSongSummary)} />
+  const songs: SongSummary[] = tagged ?? favorites.map(favoriteSongSummary)
+  const byTags = query?.mode === 'tags'
+  const tagsFailed = byTags && detailed.state.status === 'error'
+  const waiting = byTags && !tagged && !tagsFailed
+  const matches = filterSongs(songs, query)
+
+  let results = <SongGrid songs={matches} />
+  if (tagsFailed) {
+    results = (
+      <StateMessage
+        tone="error"
+        title="We could not load the tags of your favorites"
+        description="Tag search needs each song's tags. Try again in a moment."
+        action={
+          <Button variant="secondary" onClick={detailed.reload}>
+            Try again
+          </Button>
+        }
+      />
+    )
+  } else if (waiting) {
+    results = <SongGridSkeleton count={4} />
+  } else if (query && matches.length === 0) {
+    results = (
+      <StateMessage
+        title="No favorites match"
+        description={
+          byTags
+            ? 'None of your favorites has all of these tags. Remove one or try another.'
+            : 'None of your favorites has that title or artist.'
+        }
+        action={
+          <Button variant="secondary" onClick={() => search(undefined)}>
+            Clear search
+          </Button>
+        }
+      />
+    )
+  } else if (query) {
+    results = (
+      <SongGrid
+        songs={matches}
+        highlightTokens={query.mode === 'tags' ? query.tokens : undefined}
+      />
+    )
+  }
+
+  return (
+    <div className={styles.favorites}>
+      <SearchPanel
+        query={query}
+        onSearch={search}
+        inputId={FAVORITES_SEARCH_ID}
+        suggestions={suggestions}
+        titleNote="Filters your favorites by title and artist."
+      />
+      {query && !waiting && !tagsFailed ? (
+        <p className={styles.matchCount} role="status">
+          {matches.length} of {favorites.length} favorites match
+        </p>
+      ) : null}
+      {results}
+    </div>
+  )
 }
 
 function Playlists({ selectedId, openImport }: { selectedId: number | null; openImport: boolean }) {

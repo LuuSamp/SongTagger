@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useCatalog, useLibrary, useRecommendationService } from '../app/contexts'
 import { PageShell } from '../components/layout/PageShell'
 import { Button } from '../components/ui/Button'
 import { StateMessage } from '../components/ui/StateMessage'
-import { TagChip } from '../components/ui/TagChip'
 import { librarySongIds, orderTagSongs, promptChips } from '../domain/tagQueue'
-import { TAG_KIND_COLORS, tagKey } from '../domain/tags'
+import { groupTagsByKind, TAG_KIND_COLORS, TAG_KIND_LABELS, tagKey } from '../domain/tags'
 import type { UserSong, UserTag } from '../domain/types'
 import { CoverPlayer } from '../features/songs/CoverPlayer'
 import { AddTagForm } from '../features/tags/AddTagForm'
@@ -21,8 +20,14 @@ export function TagPage() {
   const [songs, setSongs] = useState<UserSong[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [done, setDone] = useState(0)
   const libraryRef = useRef(library)
   libraryRef.current = library
+  const queued = useRef<Set<number> | null>(null)
+  const libraryKey = useMemo(
+    () => librarySongIds(library.favorites, library.playlists).join(','),
+    [library.favorites, library.playlists],
+  )
 
   const favoritesSettled =
     library.favoritesStatus === 'ready' ||
@@ -39,6 +44,13 @@ export function TagPage() {
     let cancelled = false
     const { favorites, playlists } = libraryRef.current
     const ids = librarySongIds(favorites, playlists)
+    if (ids.length === 0) {
+      queued.current = new Set()
+      setSongs([])
+      setDone(0)
+      setLoadError(null)
+      return
+    }
     const known =
       ids.length === 0
         ? Promise.resolve([] as UserSong[])
@@ -53,7 +65,9 @@ export function TagPage() {
     Promise.all([known, picks]).then(
       ([loaded, fresh]) => {
         if (!cancelled) {
+          queued.current = new Set(ids)
           setSongs(orderTagSongs(loaded, fresh, Math.random))
+          setDone(0)
           setLoadError(null)
         }
       },
@@ -68,6 +82,65 @@ export function TagPage() {
       cancelled = true
     }
   }, [ready, attempt, catalog, recommendations])
+
+  useEffect(() => {
+    const seen = queued.current
+    if (!seen) {
+      return
+    }
+    const ids = libraryKey ? libraryKey.split(',').map(Number) : []
+    const inLibrary = new Set(ids)
+    const added = ids.filter((id) => !seen.has(id))
+    setSongs((queue) => {
+      if (!queue) {
+        return queue
+      }
+      const [current, ...rest] = queue
+      const kept = rest.filter((entry) => inLibrary.has(entry.id))
+      return current ? [current, ...kept] : kept
+    })
+    if (added.length === 0) {
+      return
+    }
+    added.forEach((id) => seen.add(id))
+    let cancelled = false
+    Promise.all(added.map((id) => catalog.getSong(id))).then(
+      (loaded) => {
+        if (cancelled) {
+          return
+        }
+        const fresh = orderTagSongs(loaded)
+        setSongs((queue) => {
+          if (!queue || queue.length === 0) {
+            return fresh
+          }
+          const [current, ...rest] = queue
+          return current ? [current, ...fresh, ...rest] : [...fresh, ...rest]
+        })
+      },
+      () => {
+        added.forEach((id) => seen.delete(id))
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [libraryKey, catalog])
+
+  useEffect(() => {
+    function refresh() {
+      if (document.visibilityState === 'visible') {
+        libraryRef.current.reload()
+        libraryRef.current.reloadFavorites()
+      }
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
 
   const song = songs?.[0] ?? null
   const update = useCallback((change: (current: UserSong) => UserSong) => {
@@ -107,6 +180,7 @@ export function TagPage() {
         picks.map((tag) => catalog.addTag(currentId, { kind: tag.kind, token: tag.token })),
       )
       setSongs((queue) => (queue?.[0]?.id === currentId ? queue.slice(1) : queue))
+      setDone((value) => value + 1)
     },
     [catalog, songs],
   )
@@ -148,14 +222,47 @@ export function TagPage() {
     body = <StateMessage title="Nothing to tag right now" />
   }
 
+  const position = songs && song ? done + 1 : 0
+  const total = done + (songs?.length ?? 0)
+
   return (
     <PageShell>
-      <div className={styles.column}>
-        <h1 className={styles.title}>Tag these songs</h1>
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <div className={styles.headline}>
+            <h1 className={styles.title}>Tag these songs</h1>
+            <p className={styles.intro}>
+              Songs from your favorites and playlists. Confirm what you hear and help others find
+              them.
+            </p>
+          </div>
+          {position > 0 ? <QueueProgress position={position} total={total} /> : null}
+        </header>
         {body}
       </div>
     </PageShell>
   )
+}
+
+function QueueProgress({ position, total }: { position: number; total: number }) {
+  const done = Math.min(1, (position - 1) / Math.max(1, total))
+  return (
+    <div className={styles.progress}>
+      <p className={styles.progressText}>
+        Song <strong>{position}</strong> of {total}
+      </p>
+      <span className={styles.progressTrack} aria-hidden="true">
+        <span className={styles.progressFill} style={{ width: `${done * 100}%` }} />
+      </span>
+    </div>
+  )
+}
+
+function selectionSummary(count: number): string {
+  if (count === 0) {
+    return 'Nothing selected. Go to next skips this song.'
+  }
+  return `${count} ${count === 1 ? 'tag' : 'tags'} will be saved when you go to next.`
 }
 
 function TagPrompt({
@@ -205,59 +312,141 @@ function TagPrompt({
   }
 
   const notice = saveError ?? tagging.error
+  const groups = groupTagsByKind(chips)
 
   return (
-    <div className={styles.prompt}>
-      <CoverPlayer song={song}>
-        <p className={styles.artTitle}>{song.title}</p>
-        <p className={styles.artArtist}>{song.artist_credit}</p>
-      </CoverPlayer>
-      <ul className={styles.chips}>
-        {chips.map((tag) => {
-          const selected = chosen.has(tagKey(tag))
-          return (
-            <li key={tagKey(tag)}>
-              <TagChip
-                label={tag.name}
-                tone={selected ? 'mine' : 'outline'}
-                pressed={selected}
-                marker={TAG_KIND_COLORS[tag.kind]}
-                pending={saving && selected}
-                title={selected ? 'Click again to undo' : undefined}
-                onClick={() => {
-                  if (!saving) {
-                    toggle(tag)
-                  }
-                }}
-              />
-            </li>
-          )
-        })}
-      </ul>
-      {adding ? (
-        <AddTagForm
-          id={formId}
-          defaultKind="feeling"
-          onAdd={tagging.addTag}
-          onClose={() => {
-            setAdding(false)
-            tagging.clearError()
-          }}
-          error={tagging.error}
-        />
-      ) : (
-        <Button variant="secondary" onClick={() => setAdding(true)}>
-          Add tag
-        </Button>
-      )}
-      {notice && !adding ? (
-        <p className={styles.error} role="alert">
-          {notice}
-        </p>
-      ) : null}
-      <Button busy={saving} onClick={() => void goToNext()}>
-        Go to next
-      </Button>
+    <div className={styles.workspace}>
+      <div className={styles.cover}>
+        <CoverPlayer song={song}>
+          <p className={styles.artTitle}>{song.title}</p>
+          <p className={styles.artArtist}>{song.artist_credit}</p>
+        </CoverPlayer>
+      </div>
+
+      <div className={styles.panel}>
+        <ol className={styles.steps}>
+          <li className={styles.step}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              1
+            </span>
+            <div className={styles.stepBody}>
+              <p className={styles.stepTitle}>Listen</p>
+              <p className={styles.stepHint}>Press play on the cover to hear it while you tag.</p>
+            </div>
+          </li>
+
+          <li className={styles.step}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              2
+            </span>
+            <div className={styles.stepBody}>
+              <p className={styles.stepTitle}>Pick what fits</p>
+              <p className={styles.stepHint}>
+                Other listeners tagged this song. Tap the ones you hear too.
+              </p>
+              {groups.length > 0 ? (
+                <div className={styles.groups}>
+                  {groups.map(([kind, tags]) => (
+                    <div
+                      key={kind}
+                      className={styles.group}
+                      style={{ '--kind': TAG_KIND_COLORS[kind] } as CSSProperties}
+                    >
+                      <p className={styles.groupLabel}>{TAG_KIND_LABELS[kind]}</p>
+                      <ul
+                        className={styles.suggestions}
+                        aria-label={`${TAG_KIND_LABELS[kind]} tags`}
+                      >
+                        {tags.map((tag) => {
+                          const selected = chosen.has(tagKey(tag))
+                          return (
+                            <li key={tagKey(tag)} className={selected ? styles.mine : undefined}>
+                              <button
+                                type="button"
+                                className={styles.suggestion}
+                                aria-pressed={selected}
+                                aria-busy={saving && selected ? true : undefined}
+                                title={selected ? 'Click again to undo' : undefined}
+                                onClick={() => {
+                                  if (!saving) {
+                                    toggle(tag)
+                                  }
+                                }}
+                              >
+                                <svg
+                                  className={styles.mark}
+                                  viewBox="0 0 16 16"
+                                  aria-hidden="true"
+                                  focusable="false"
+                                >
+                                  {selected ? (
+                                    <path d="M3.5 8.5l3 3 6-7" />
+                                  ) : (
+                                    <path d="M8 3.5v9M3.5 8h9" />
+                                  )}
+                                </svg>
+                                {tag.name}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.empty}>No suggestions yet. Add your own below.</p>
+              )}
+            </div>
+          </li>
+
+          <li className={styles.step}>
+            <span className={styles.stepNumber} aria-hidden="true">
+              3
+            </span>
+            <div className={styles.stepBody}>
+              <p className={styles.stepTitle}>Add what&apos;s missing</p>
+              <p className={styles.stepHint}>Your own tags save right away.</p>
+              {adding ? (
+                <AddTagForm
+                  id={formId}
+                  defaultKind="feeling"
+                  onAdd={tagging.addTag}
+                  onClose={() => {
+                    setAdding(false)
+                    tagging.clearError()
+                  }}
+                  error={tagging.error}
+                />
+              ) : (
+                <Button
+                  className={styles.addButton}
+                  variant="secondary"
+                  onClick={() => setAdding(true)}
+                >
+                  Add tag
+                </Button>
+              )}
+            </div>
+          </li>
+        </ol>
+
+        <div className={styles.actions}>
+          <div className={styles.actionText}>
+            <p className={styles.summary} aria-live="polite">
+              {selectionSummary(chosen.size)}
+            </p>
+            {notice && !adding ? (
+              <p className={styles.error} role="alert">
+                {notice}
+              </p>
+            ) : null}
+          </div>
+          <Button size="lg" busy={saving} onClick={() => void goToNext()}>
+            Go to next
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
