@@ -204,6 +204,64 @@ describe('Tag these songs', () => {
     expect(buttons(view)).toContain('Go to next')
   })
 
+  it('stages a custom tag above add tag and saves it on go to next', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Add tag')
+    await typeTag(view, 'Late night')
+    await click(view, 'Add')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(text(view)).toContain('They save when you go to next.')
+    expect(pressed(view, 'Late night')).toBe('true')
+    expect(chipClass(view, 'Late night')).toMatch(/mine/)
+    expect(chipButton(view, 'Late night').parentElement?.getAttribute('style')).toContain(
+      '--tag-feeling',
+    )
+    expect(chipPrecedes(view, 'Late night', 'form')).toBe(true)
+    expect(view.querySelector('[aria-live="polite"]')?.textContent).toBe(
+      '1 tag will be saved when you go to next.',
+    )
+
+    await click(view, 'Late night')
+    expect(pressed(view, 'Late night')).toBe('false')
+    expect(chipButton(view, 'Late night')).toBeInstanceOf(HTMLButtonElement)
+
+    await click(view, 'Late night')
+    expect(pressed(view, 'Late night')).toBe('true')
+
+    await click(view, 'Go to next')
+    expect(addTag).toHaveBeenCalledTimes(1)
+    expect(addTag).toHaveBeenCalledWith(1, { kind: 'feeling', token: 'late-night' })
+    expect(text(view)).toContain('Playlist Tune')
+    expect(text(view)).not.toContain('Late night')
+  })
+
+  it('selects an existing suggestion instead of adding a second chip', async () => {
+    const addTag = savedTag()
+    const view = await renderQueue({ addTag })
+
+    await click(view, 'Add tag')
+    await typeTag(view, 'Warm')
+    await click(view, 'Add')
+
+    expect(addTag).not.toHaveBeenCalled()
+    expect(pressed(view, 'Warm')).toBe('true')
+    expect(buttons(view).filter((name) => name === 'Warm')).toHaveLength(1)
+  })
+
+  it('asks for a tag when the name has no token', async () => {
+    const view = await renderQueue()
+
+    await click(view, 'Add tag')
+    await typeTag(view, '---')
+    await click(view, 'Add')
+
+    expect(view.querySelector('#add-tag-error')?.textContent).toBe('Type a tag before adding it.')
+    expect(view.querySelector('form')).not.toBeNull()
+  })
+
   it('puts a newly liked song right after the current one', async () => {
     const liked = song(3, 'New Like', [tag('feeling', 'Sunny')])
     const songs = [favoriteSong, playlistSong, liked]
@@ -389,10 +447,13 @@ let reloadSpy = vi.fn()
 let reloadFavoritesSpy = vi.fn()
 let catalogSongs = new Map<number, UserSong>()
 let catalog: CatalogService | null = null
+let recommendationSongs: UserSong[] = []
+let recommendations: RecommendationService | null = null
 
 function tree(options: QueueOptions = {}) {
   const resolved = queueOptions(options)
   catalogSongs = new Map(resolved.songs.map((entry) => [entry.id, entry]))
+  recommendationSongs = resolved.recommendations
   catalog ??= {
     kind: 'http',
     getSong: (songId: number) => {
@@ -401,11 +462,11 @@ function tree(options: QueueOptions = {}) {
     },
     addTag: resolved.addTag,
   } as CatalogService
-  const recommendations = {
+  recommendations ??= {
     kind: 'http',
     recommend: () =>
       Promise.resolve({
-        songs: resolved.recommendations.map((entry) => ({
+        songs: recommendationSongs.map((entry) => ({
           song: entry,
           score: 1,
           because: [],
@@ -442,6 +503,7 @@ function renderNow(options: QueueOptions = {}): HTMLElement {
   reloadSpy = vi.fn()
   reloadFavoritesSpy = vi.fn()
   catalog = null
+  recommendations = null
   const container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -492,6 +554,27 @@ function pressed(view: HTMLElement, name: string): string | null {
 
 function chipClass(view: HTMLElement, name: string): string {
   return chipButton(view, name).parentElement?.className ?? ''
+}
+
+function chipPrecedes(view: HTMLElement, name: string, selector: string): boolean {
+  const chip = chipButton(view, name)
+  const later = chip.closest('li')?.parentElement?.parentElement?.querySelector(selector)
+  if (!later) {
+    return false
+  }
+  return Boolean(chip.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING)
+}
+
+async function typeTag(view: HTMLElement, name: string) {
+  const input = view.querySelector('#add-tag-name')
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error('No tag name field')
+  }
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(input, name)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
 }
 
 async function click(view: HTMLElement, name: string) {

@@ -4,11 +4,17 @@ import { PageShell } from '../components/layout/PageShell'
 import { Button } from '../components/ui/Button'
 import { StateMessage } from '../components/ui/StateMessage'
 import { librarySongIds, orderTagSongs, promptChips } from '../domain/tagQueue'
-import { groupTagsByKind, TAG_KIND_COLORS, TAG_KIND_LABELS, tagKey } from '../domain/tags'
-import type { UserSong, UserTag } from '../domain/types'
+import {
+  displayTagName,
+  groupTagsByKind,
+  TAG_KIND_COLORS,
+  TAG_KIND_LABELS,
+  tagKey,
+  toToken,
+} from '../domain/tags'
+import type { TagWrite, UserSong, UserTag } from '../domain/types'
 import { CoverPlayer } from '../features/songs/CoverPlayer'
 import { AddTagForm } from '../features/tags/AddTagForm'
-import { useTagMutations } from '../hooks/useTagMutations'
 import styles from './TagPage.module.css'
 
 const RECOMMENDATION_LIMIT = 12
@@ -44,13 +50,6 @@ export function TagPage() {
     let cancelled = false
     const { favorites, playlists } = libraryRef.current
     const ids = librarySongIds(favorites, playlists)
-    if (ids.length === 0) {
-      queued.current = new Set()
-      setSongs([])
-      setDone(0)
-      setLoadError(null)
-      return
-    }
     const known =
       ids.length === 0
         ? Promise.resolve([] as UserSong[])
@@ -109,7 +108,7 @@ export function TagPage() {
         if (cancelled) {
           return
         }
-        const fresh = orderTagSongs(loaded)
+        const fresh = orderTagSongs(loaded, [], Math.random)
         setSongs((queue) => {
           if (!queue || queue.length === 0) {
             return fresh
@@ -143,32 +142,6 @@ export function TagPage() {
   }, [])
 
   const song = songs?.[0] ?? null
-  const update = useCallback((change: (current: UserSong) => UserSong) => {
-    setSongs((queue) => {
-      if (!queue?.[0]) {
-        return queue
-      }
-      return [change(queue[0]), ...queue.slice(1)]
-    })
-  }, [])
-  const reload = useCallback(() => {
-    setSongs((queue) => {
-      const current = queue?.[0]
-      if (!current) {
-        return queue
-      }
-      void catalog.getSong(current.id).then((fresh) => {
-        setSongs((latest) => {
-          if (!latest?.[0] || latest[0].id !== fresh.id) {
-            return latest
-          }
-          return [fresh, ...latest.slice(1)]
-        })
-      })
-      return queue
-    })
-  }, [catalog])
-  const tagging = useTagMutations({ songId: song?.id ?? 0, update, reload })
 
   const commitAndNext = useCallback(
     async (picks: readonly UserTag[]) => {
@@ -217,7 +190,7 @@ export function TagPage() {
       />
     )
   } else if (songs && song) {
-    body = <TagPrompt song={song} tagging={tagging} onNext={commitAndNext} />
+    body = <TagPrompt song={song} onNext={commitAndNext} />
   } else if (songs) {
     body = <StateMessage title="Nothing to tag right now" />
   }
@@ -267,23 +240,25 @@ function selectionSummary(count: number): string {
 
 function TagPrompt({
   song,
-  tagging,
   onNext,
 }: {
   song: UserSong
-  tagging: ReturnType<typeof useTagMutations>
   onNext: (picks: readonly UserTag[]) => Promise<void>
 }) {
   const [adding, setAdding] = useState(false)
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set())
+  const [custom, setCustom] = useState<UserTag[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const formId = useId()
   const chips = promptChips(song)
 
   useEffect(() => {
     setChosen(new Set())
+    setCustom([])
     setSaveError(null)
+    setFormError(null)
   }, [song.id])
 
   function toggle(tag: UserTag) {
@@ -299,11 +274,35 @@ function TagPrompt({
     })
   }
 
+  function stageTag(write: TagWrite): Promise<boolean> {
+    const token = toToken(write.token)
+    if (!token) {
+      setFormError('Type a tag before adding it.')
+      return Promise.resolve(false)
+    }
+    const tag: UserTag = {
+      kind: write.kind,
+      token,
+      name: displayTagName(write.token),
+      applied_by_me: false,
+    }
+    const key = tagKey(tag)
+    setFormError(null)
+    setCustom((current) => {
+      const known =
+        chips.some((chip) => tagKey(chip) === key) || current.some((entry) => tagKey(entry) === key)
+      return known ? current : [...current, tag]
+    })
+    setChosen((current) => new Set(current).add(key))
+    return Promise.resolve(true)
+  }
+
   async function goToNext() {
     setSaving(true)
     setSaveError(null)
     try {
-      await onNext(chips.filter((tag) => chosen.has(tagKey(tag))))
+      const picks = [...chips, ...custom].filter((tag) => chosen.has(tagKey(tag)))
+      await onNext(picks)
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : 'Could not save these tags.')
     } finally {
@@ -311,7 +310,6 @@ function TagPrompt({
     }
   }
 
-  const notice = saveError ?? tagging.error
   const groups = groupTagsByKind(chips)
 
   return (
@@ -357,39 +355,15 @@ function TagPrompt({
                         className={styles.suggestions}
                         aria-label={`${TAG_KIND_LABELS[kind]} tags`}
                       >
-                        {tags.map((tag) => {
-                          const selected = chosen.has(tagKey(tag))
-                          return (
-                            <li key={tagKey(tag)} className={selected ? styles.mine : undefined}>
-                              <button
-                                type="button"
-                                className={styles.suggestion}
-                                aria-pressed={selected}
-                                aria-busy={saving && selected ? true : undefined}
-                                title={selected ? 'Click again to undo' : undefined}
-                                onClick={() => {
-                                  if (!saving) {
-                                    toggle(tag)
-                                  }
-                                }}
-                              >
-                                <svg
-                                  className={styles.mark}
-                                  viewBox="0 0 16 16"
-                                  aria-hidden="true"
-                                  focusable="false"
-                                >
-                                  {selected ? (
-                                    <path d="M3.5 8.5l3 3 6-7" />
-                                  ) : (
-                                    <path d="M8 3.5v9M3.5 8h9" />
-                                  )}
-                                </svg>
-                                {tag.name}
-                              </button>
-                            </li>
-                          )
-                        })}
+                        {tags.map((tag) => (
+                          <PromptChip
+                            key={tagKey(tag)}
+                            tag={tag}
+                            selected={chosen.has(tagKey(tag))}
+                            saving={saving}
+                            onToggle={toggle}
+                          />
+                        ))}
                       </ul>
                     </div>
                   ))}
@@ -406,17 +380,30 @@ function TagPrompt({
             </span>
             <div className={styles.stepBody}>
               <p className={styles.stepTitle}>Add what&apos;s missing</p>
-              <p className={styles.stepHint}>Your own tags save right away.</p>
+              <p className={styles.stepHint}>They save when you go to next.</p>
+              {custom.length > 0 ? (
+                <ul className={styles.suggestions} aria-label="Your tags">
+                  {custom.map((tag) => (
+                    <PromptChip
+                      key={tagKey(tag)}
+                      tag={tag}
+                      selected={chosen.has(tagKey(tag))}
+                      saving={saving}
+                      onToggle={toggle}
+                    />
+                  ))}
+                </ul>
+              ) : null}
               {adding ? (
                 <AddTagForm
                   id={formId}
                   defaultKind="feeling"
-                  onAdd={tagging.addTag}
+                  onAdd={stageTag}
                   onClose={() => {
                     setAdding(false)
-                    tagging.clearError()
+                    setFormError(null)
                   }}
-                  error={tagging.error}
+                  error={formError}
                 />
               ) : (
                 <Button
@@ -436,9 +423,9 @@ function TagPrompt({
             <p className={styles.summary} aria-live="polite">
               {selectionSummary(chosen.size)}
             </p>
-            {notice && !adding ? (
+            {saveError ? (
               <p className={styles.error} role="alert">
-                {notice}
+                {saveError}
               </p>
             ) : null}
           </div>
@@ -448,5 +435,42 @@ function TagPrompt({
         </div>
       </div>
     </div>
+  )
+}
+
+function PromptChip({
+  tag,
+  selected,
+  saving,
+  onToggle,
+}: {
+  tag: UserTag
+  selected: boolean
+  saving: boolean
+  onToggle: (tag: UserTag) => void
+}) {
+  return (
+    <li
+      className={selected ? styles.mine : undefined}
+      style={{ '--kind': TAG_KIND_COLORS[tag.kind] } as CSSProperties}
+    >
+      <button
+        type="button"
+        className={styles.suggestion}
+        aria-pressed={selected}
+        aria-busy={saving && selected ? true : undefined}
+        title={selected ? 'Click again to undo' : undefined}
+        onClick={() => {
+          if (!saving) {
+            onToggle(tag)
+          }
+        }}
+      >
+        <svg className={styles.mark} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          {selected ? <path d="M3.5 8.5l3 3 6-7" /> : <path d="M8 3.5v9M3.5 8h9" />}
+        </svg>
+        {tag.name}
+      </button>
+    </li>
   )
 }

@@ -1,6 +1,6 @@
 # SongTagger UI: implementation record and remaining work
 
-This document covers the React frontend in `UI/` as of 2026-10-10, third iteration. The Library is now backed by the real playlist API and the favorites API, and demo data lives in MariaDB. It describes what exists, what is still mocked, and what is left before production.
+This document covers the React frontend in `UI/` as of 2026-10-11. The Library is backed by the playlist and favorites APIs, the community feed and recommendations are live, playlist detail includes tag counts, and demo data lives in MariaDB. It describes what exists, what is still mocked, and what is left before production.
 
 Status legend used throughout:
 
@@ -28,7 +28,7 @@ python -m db.manager    # schema (safe to re-run; adds new tables)
 python -m db.seed       # ~102 songs from MusicBrainz, about 2 minutes
 python -m db.seed_demo  # demo users, tags and playlists (idempotent)
 python -m API           # FastAPI on 127.0.0.1:8001
-python -m pytest tests  # backend suite (16 tests passed here)
+python -m pytest tests  # backend suite
 ```
 
 What `db/seed_demo.py` creates (also documented in `db/README.md`):
@@ -82,7 +82,7 @@ UI/src/
   features/tags/           TagList, TagKindFilter, AddTagForm
   features/discovery/      VibeHero, VibeList, VibeArt, SearchPanel, SearchResults, SongShelf
   features/library/        AddToPlaylist (popover), PlaylistCard
-  pages/                   LandingPage, DiscoverPage, CommunityPage, LibraryPage, SongPage, NotFoundPage
+  pages/                   LandingPage, DiscoverPage, CommunityPage, TagPage, LibraryPage, SongPage, NotFoundPage
 ```
 
 Dependency rules:
@@ -99,7 +99,8 @@ Routing (`app/router.tsx`, URLs built by `app/routes.ts`):
 | `/` | `LandingPage` | "Hanging tags" hero (`features/discovery/HangingTags.tsx`): three showcase songs as luggage tags on a string, each with its cover, title and real community tags. Behind them, a canvas (`WindLayer.tsx`, physics in `windField.ts`) draws a faint wind and up to 5 music notes (3 on mobile). The wind gusts on the same 7s period as the tag sway, and the notes drift on it with drag, lift and flutter. The notes stay in the cards' middle band (36%–66% of the height), behind the tags, so they mostly show in the gaps and at the edges. Each note has its own wind gain, wind phase and eddy noise (an Ornstein–Uhlenbeck process), so notes never move in lockstep. It pauses off-screen or in a hidden tab, and is not rendered under reduced motion. Pitch, "Let's begin" and "Explore by vibe" sit on the right. `LandingHeader` shows only the logo. Legacy `/?tags=` and `/?title=` links redirect to `/discover`. |
 | `/discover` | `DiscoverPage` | Search with `?tags=` or `?title=&artist=`. With no query it shows the "For you" shelves. The search is a tag composer (`features/discovery/SearchPanel.tsx`): "Tags · Title" underline tabs, then one large boxed field. The box has an accent border and ring on focus. A magnifier glyph inside it does a small "look around" motion every ~7s, pauses and turns accent while focused, and stays still under reduced motion. Clicking empty space in the box focuses the input. In Tags mode the active tags are removable chips inside the field; Enter or a comma adds tags, and Backspace on an empty input removes the last one. A "Try" / "Narrow it down" row suggests real vibe tokens. Title mode uses the same field with a "by artist" input. |
 | `/community` | `CommunityPage` | Aggregate, anonymous community feed from `GET /users/{u}/community` (see "Community" below). It has "Trending this week" shelves with a reason line per song, "Rising tags" chips with people counts, and "In their words": the top tags for the leading songs, with the number of people behind each. |
-| `/library` | `LibraryPage` | The default tab is Playlists. `?tab=favorites` shows the pending-feature notice, and `?playlist=<id>` selects a playlist. |
+| `/tag` | `TagPage` | Queue of saved songs with recommendations placed between them. See "Tag these songs". |
+| `/library` | `LibraryPage` | The default tab is Playlists. `?tab=favorites` lists favorites and can filter them (see "Library › Favorites search"). `?playlist=<id>` selects a playlist. |
 | `/songs/:songId` | `SongPage` | A non-numeric id or an API 404 shows "not in the catalog". |
 | `*` | `NotFoundPage` | |
 
@@ -108,7 +109,7 @@ In-app pages use `AppNavBar`: the round logo, a search pill (tag search → `/di
 Reference mapping:
 - **Landing** keeps image 2's split layout, but the three gradient vibe panels were replaced with hanging luggage tags that echo the logo, because the user found the panels generic.
 - **The app bar** follows the third reference.
-- **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart works once the favorites API exists and shows a "coming soon" note until then. The playlist button carries a count badge and opens its panel right-aligned under the cover. The play button is not shown because playback is not implemented. The tags section (`features/tags/SongTagsPanel.tsx`) shows every category at once, grouped as Artist / Genre / Feeling / Instrument with a colour dot and a count:
+- **The song page** follows image 1. The favorite and add-to-playlist actions sit in the top-right corner of the cover artwork as glass icon buttons (tokens `--glass-*` in `theme/tokens.css`). The heart toggles a favorite through the favorites API. The playlist button carries a count badge and opens its panel right-aligned under the cover. A glass play button opens the embed player when the song has an embeddable source (see "Song player"). The tags section (`features/tags/SongTagsPanel.tsx`) shows every category at once, grouped as Artist / Genre / Feeling / Instrument with a colour dot and a count:
   - The header has the title, a count and a round + button that opens the add form.
   - The chips are compact.
   - Each category shows up to 5 tags and a "+N" toggle for the rest. The user's own tags always stay visible (`visibleTags` in `domain/tags.ts`).
@@ -153,6 +154,14 @@ Reordering (`features/library/PlaylistTrackList.tsx`) works like this:
 - **Saving:** `reorderSongs` in the provider is optimistic. It applies the new order at once and restores the previous one if the API call fails.
 - **Accessibility:** a polite live region announces "Moved X to position N".
 
+`GET /user/{id}/playlist/{pid}` (and the create, add, and reorder responses, which return the same playlist document) now includes tags:
+
+- Each song has `tags`: `{ kind, name, token, count }[]`, every tag on that song, ranked by count, then kind, then token.
+- The playlist has `tags` as well: those counts summed across distinct songs, capped at 5 (`PLAYLIST_TAG_LIMIT` in `API/Services/tag_rank.py`). A song that appears twice does not count twice.
+- `GET /user/{id}/playlist` (the summary list) does not include tags.
+- Covered by `test_playlist_tags_rank_by_count_and_skip_duplicate_memberships` in `tests/test_api.py`.
+- `UI/src/domain/library.ts` does not declare `tags` yet, so the running UI ignores them.
+
 `app/LibraryProvider.tsx` holds `status` (`loading | ready | unavailable | error`), the loaded `Playlist[]`, a shared `pending` flag and `actionError`. Every mutation updates state from the server response, or from a refetch after a 204. Popover checkboxes flip immediately while the request runs and settle on the server state afterwards.
 
 ### Discovery "For you"
@@ -161,7 +170,7 @@ Reordering (`features/library/PlaylistTrackList.tsx`) works like this:
 
 The tag shelves below it are built in the browser:
 
-1. `usePlaylistSongs` fetches full songs (with tags) for up to 12 distinct songs across the user's playlists. It needs `GET /users/{u}/songs/{id}` per song, because `PlaylistSong` has no tags.
+1. `usePlaylistSongs` fetches full songs (with the listener's own tags) for up to 12 distinct songs across the user's playlists, one `GET /users/{u}/songs/{id}` per song. Playlist detail now includes tag counts, and this hook does not read them yet.
 2. `topInterests` ranks those songs' tags: tags shared by several songs come first, then it alternates between songs (genre > feeling > instrument > artist).
 3. `useShelves` runs one tag search per interest and excludes songs already in playlists. The page shows the first 3 non-empty shelves.
 4. When there are no playlist songs, it shows the three featured vibes.
@@ -177,12 +186,12 @@ Verified with ada's seeded playlists: "Because you like Jazz / Latin / Pop".
 | "Demo data" banner | `components/ui/DemoNotice.tsx` | Makes mock mode obvious | Shown only in mock mode | n/a |
 | Acting user from env (`ada`) | `config/session.ts`, `SessionContext` | No login | Static | Replace with authenticated user (see D). |
 | Brand icons for sources | `features/songs/SourceIcon.tsx`, `features/songs/sourceBrands.ts` | Recognisable links | Brand SVG paths and colours from `simple-icons` (CC0, pinned `16.32.0`; only five icons are bundled). Discogs' near-black brand colour is drawn with the ink token for contrast. Unknown sources use a generic link glyph. The icons only link to each service. | Add a mapping in `sourceBrands.ts` for any new source. |
-| Generated artwork | `features/songs/SongArtwork.tsx` | No cover art in the API/DB | Deterministic per song. Playlist songs have no tags, so their artwork uses a hashed palette. | Add cover URLs; keep generated art as fallback. |
+| Generated artwork | `features/songs/SongArtwork.tsx` | Fallback when `image_url` is null | Covers are stored by `db/covers.py` and returned as `image_url` on songs and playlists. `SongArtwork` shows that URL when it is set, and the hashed palette otherwise. | Keep the generated art as the fallback. |
 | Landing showcase songs | `config/showcase.ts` | Editorial config for the landing hero | Static. Every title and tag was checked against the seeded database: each link returns at least 1 song. | Keep, or feed from a featured-songs endpoint later. |
 | Vibe collections | `config/vibes.ts` | Editorial config; each vibe is a real tag query | Static | Checked against the seeded DB: every main query (dream-pop, jazz, electronic, mpb, soul, rock) and chip has songs. The chips `modal-jazz`, `hard-bop`, `tropicalia`, `groovy` and `synth-pop` were replaced because they returned nothing or cannot be searched (see D). |
 | Similar songs and "Because you like" shelves | `hooks/useSimilarSongs.ts`, `domain/interests.ts`, `hooks/usePlaylistSongs.ts` | Built before the recommendations endpoint existed | Real queries, client-side ranking | "Picked for you" already uses the real endpoint. Move similar songs to a server-side song-to-song version of the same tag profiles. |
 | Demo database content | `db/seed_demo.py` | The user asked for test data | Idempotent script | Keep for local development. Never run it against production. |
-| Community page | `pages/CommunityPage.tsx` | Placeholder requested | Static "Coming soon" | Implement once activity/counts endpoints exist. |
+| Community page | `pages/CommunityPage.tsx` | Aggregate feed | Implemented. See "Community". | n/a |
 
 ## D. Remaining implementation work and known issues
 
@@ -213,15 +222,12 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 ### API gaps and inconsistencies found while integrating
 1. **Mixed user addressing.** Catalog routes use `/users/{username}`, while playlist routes use `/user/{user_id}` (singular, numeric). The frontend has to call `GET /users/{username}` first and cache the id. Unifying the routes would remove that round trip.
 2. **Playlist summaries have no song count.** The Library therefore calls `GET` for every playlist on load (N+1 requests). Adding `song_count` (and maybe the first 4 song ids for the mosaic) to `PlaylistSummary` would fix it.
-3. **`PlaylistSong` has no tags, sources or duration.** As a result:
-   - Playlist artwork uses a fallback palette.
-   - Discovery fetches up to 12 songs one by one to learn the user's tastes.
-   - Embedding the tags, or offering a batch song endpoint, would help.
+3. **`PlaylistSong` has tags and `image_url`, and still has no sources or duration.** Playlist detail returns the tag lists described above. The frontend type omits `tags`, so Discovery still fetches up to 12 songs one by one, and playlist artwork uses `image_url` when the API sent one.
 4. **Hyphenated tag names cannot be searched.** Search turns `-` into a space, so a stored genre named `synth-pop` (normalized `synth-pop`) is never matched by the query `synth-pop` (which becomes `synth pop`). It affects every MusicBrainz genre containing a hyphen (synth-pop, hip-hop variants, etc.). The fix belongs in `API/Services/tags.py` and `db/seed.py`: normalize hyphens the same way at write and search time.
 5. **First display name wins.** A tag keeps the display name it was created with. Once someone creates `paulistano` in lowercase, later "Paulistano" requests keep the lowercase name.
 6. **No user creation or auth.** Users exist only through SQL or the demo seed. `VITE_SONGTAGGER_USERNAME` decides who is acting.
 7. **No CORS.** The UI depends on the Vite proxy. Production needs a reverse proxy or `CORSMiddleware`.
-8. **No tag counts, listing or autocomplete.** This blocks the popularity bars and tag suggestions.
+8. **No tag listing or autocomplete.** Playlist detail now returns an application `count` on each tag. There is still no endpoint to list or complete tags, which blocks the popularity bars and the tag suggestions on the song page.
 9. **Listening history is not recorded.** `user_songs.action = 'listen'` exists, and the recommender already weighs it (1.0), but nothing writes it.
 
 ### Frontend known issues
@@ -232,24 +238,24 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 - **StrictMode double fetches.** In development, StrictMode fetches twice (harmless). There is no `AbortController` cancellation.
 - **Local MariaDB is not a Windows service.** It must be started manually after a reboot (command above). Run the MSI installer as administrator if a service is wanted.
 - **Accessibility.** Basics are in place (labels, focus rings, `aria-*`, reduced motion). No axe or Lighthouse audit has been run.
-- **Tests.** There are 45 Vitest unit tests, covering tag normalization, the mock catalog, playlist helpers, interests, playback parsing, wave paths, and the `httpLibrary` and `httpRecommendations` request mapping. Browser checks were throwaway Playwright scripts, not a committed E2E suite.
+- **Tests.** Vitest has 85 cases, covering tag normalization, the mock catalog, playlist helpers, interests, playback parsing, wave paths, scenes, the tag queue, favorites search, and the `httpLibrary` and `httpRecommendations` request mapping. Two `TagPage` cases fail (see that section). Browser checks were throwaway Playwright scripts, not a committed E2E suite.
 
 ## E. Integration roadmap (priority order)
 
 1. **Favorites API** (`user_songs` like) is done. The heart and Library Favorites tab already call it. Next is the rest of this list.
 2. **Fix hyphenated tag search** in the API and seed normalization.
 3. **Unify user addressing** and add `song_count` (and preview song ids) to playlist summaries.
-4. **Include tags in `PlaylistSong`** or add a batch song endpoint, then simplify `usePlaylistSongs`.
+4. **Read the playlist tag lists in the UI** (`domain/library.ts`, then `usePlaylistSongs`), and drop the per-song catalog fetches. Sources and duration on `PlaylistSong` are still absent.
 5. **Auth and user creation**, replacing the env username in `SessionContext` and wiring the avatar in `AppNavBar`.
 6. **CORS or a production reverse proxy**, plus a configurable `apiBaseUrl`.
-7. **Tag counts and autocomplete**, for the popularity bars from reference 1 and tag suggestions.
-8. **Community page**, built on community-wide activity and counts.
+7. **Tag listing and autocomplete**, for the popularity bars from reference 1 and tag suggestions. Playlist detail already returns an application count per tag.
+8. **Community page** is done (`GET /users/{username}/community`). Recording real listens is the remaining piece, under "Community".
 9. **Recommendations, next steps:** record listens and skips (from the embed player or Spotify recently-played), add a "not for me" negative signal, and move similar songs to the server. Then re-run the evaluation in `API/Recommender/RESULTS.md` once there are dozens of active listeners.
 10. **Committed E2E tests** (Playwright) for the flows below against a seeded test database, plus an axe audit.
 11. **Robustness:** request cancellation, per-action pending state, and friendlier 5xx messages.
 
 ### Flows verified against the real API (MariaDB + `python -m API` + `VITE_DATA_SOURCE=http`, 1440 px and 390 px)
-- **Library list:** shows ada's seeded playlists. The Favorites tab shows the pending-feature notice.
+- **Library list:** shows ada's seeded playlists. The Favorites tab lists liked songs. The checks under "Favorites, real API" are the current behavior.
 - **Drag and drop:** dragging Giant Steps from 5th to the top gives `Giant Steps, So What, …` in the DOM and in `GET /user/3/playlist/1`. A short drag moves a song past two rows, a click without movement changes nothing, and Arrow Up on a focused handle moves the song and keeps the focus. A mid-drag screenshot shows the lifted row and the shifted rows. The order was restored afterwards.
 - **Playlist detail:** moving Summertime up reorders the playlist, renaming to "Noite Adentro" works, and both survive a reload. Both were reverted afterwards.
 - **Song page popover:**
@@ -289,7 +295,7 @@ The song-page heart and the Library Favorites tab use this contract. Likes are `
 **Signals:**
 - tags applied by listeners (`song_tags`);
 - playlist adds (`playlist_songs`, which now has `created_at`, added by an idempotent `ALTER` in `db/schema.sql`);
-- favorites (`user_songs` with `action = 'like'`). Favorites are ready but still empty until the favorites API exists.
+- favorites (`user_songs` with `action = 'like'`), written by the favorites API.
 
 The `catalog` user is always excluded, and each person counts once per song and signal kind.
 
@@ -463,7 +469,7 @@ The song page picks one of seven "scenes" from the song's real tags. Only the mo
 
 ## "Tag these songs" page layout
 
-`/tag` (`UI/src/pages/TagPage.tsx`) keeps the queue logic from the minigame commit and only changes how the page explains and lays out the work.
+`/tag` (`UI/src/pages/TagPage.tsx`) keeps the layout from the minigame commit. The queue now mixes recommendations in with saved songs.
 
 **Header:**
 - The title sits on one line, with one sentence of purpose: "Songs from your favorites and playlists. Confirm what you hear and help others find them."
@@ -474,24 +480,23 @@ The song page picks one of seven "scenes" from the song's real tags. Only the mo
 - **Right:** three numbered steps in an `<ol>`. The labels are paragraphs, not headings, so the `h1` stays the only heading as the existing tests require.
   1. **Listen.**
   2. **Pick what fits:** the suggestions are light sentence-case toggles (a page-local button, not the shared `TagChip`), in rows labelled Feeling and Instrument. Each shows "+", which becomes a check, and takes its kind colour (`--tag-feeling` / `--tag-instrument`) only when selected. Below 520 px the label sits above its row. A song with no suggestions says "No suggestions yet. Add your own below."
-  3. **Add what's missing:** the same `AddTagForm`, with a note that these save right away.
+  3. **Add what's missing:** the same `AddTagForm`. A tag you add appears selected above Add tag, with the same check and kind colour as the suggestions. Clicking it again deselects it and leaves the chip. Selected custom tags save with "Go to next", not when the form is submitted.
 - **Action row:** a live summary ("2 tags will be saved when you go to next." or "Nothing selected. Go to next skips this song.") and the "Go to next" button.
 
 **Under 900 px:**
 - The cover shrinks to 15 rem.
 - The action row sticks to the bottom of the screen, so "Go to next" is always reachable.
 
-**Unchanged:** queue order, selection staging, saving on "Go to next", own tags saving immediately, and the empty and error states.
+**Queue order** (`domain/tagQueue.ts`): saved songs are shuffled, with songs that still have a feeling or instrument chip ahead of the rest. `GET /user/{id}/recommendations` supplies extra songs, placed in the gaps between saved ones (at most one per gap). A song already in the library is not inserted again. When favorites and playlists are both empty, the page still asks for recommendations and plays that list. Selection staging, saving on "Go to next" (including tags typed on this page), and the empty and error states are unchanged.
 
 **Live queue:** the queue follows the library while the page is open.
-- A song newly liked or added to a playlist is fetched and placed right after the current song.
 - A waiting song that leaves the library is dropped. The song on screen always stays.
-- When the window regains focus or the tab becomes visible, the page reloads favorites and playlists, so likes made in another tab show up.
+- When the window regains focus or the tab becomes visible, the page reloads favorites and playlists.
 - Progress is "done + remaining", so it stays consistent as the queue changes.
 - Songs already passed in this visit never come back.
-- Verified in Chrome against the real API: a like made outside the page moved the queue from 1 of 15 to 1 of 16 on focus, and that song came up next. The like was then removed.
+- A song liked or added while the page is open is fetched and inserted right after the current song. That batch is ordered on its own (chips first) with an empty recommendation list, so a like does not ask for more recommendations.
 
-**Tests:** `TagPage.test.tsx` has 19 tests (12 original + 7 new): progress, grouping, the selection summary, the no-suggestions message, a new like joining the queue, a removed song leaving it, and the reload on focus.
+**Tests:** `TagPage.test.tsx` has 24 tests and they pass, including progress, grouping, the selection summary, the no-suggestions message, a removed song leaving the queue, the reload on focus, a recommendation placed between two saved songs, a like inserted after the current song, recommendations when the library is empty, and a custom tag staged above Add tag until "Go to next". `tagQueue.test.ts` has 7 tests and they pass.
 
 **Verified in Chrome against the real API:**
 - At 1440×900 and 1280×720 the title is on one line, there is no horizontal overflow, and "Go to next" is visible without scrolling.
@@ -500,9 +505,10 @@ The song page picks one of seven "scenes" from the song's real tags. Only the mo
 - The grouped chips could not be checked in the browser because none of ada's queued songs has pending suggestions right now; the unit tests cover them.
 
 **Open issues found while checking:**
-- **Phone overflow:** since the "Tag these songs" nav item was added, `AppNavBar` overflows phone widths by about 34 px on every page (the search field and avatar run past the edge). It needs a shorter label or a scrollable nav on small screens.
-- **`happy-dom`:** it is declared in `UI/package.json` but was not installed. `npm install` fixes it; there is no lockfile in `UI/`.
-- **Formatting:** `npm run format:check` flags seven files from the minigame commit (`router.tsx`, `routes.ts`, `AppNavBar.tsx`, `TagChip.tsx`, `TagChip.module.css`, `tagQueue.ts` and `CommunityPage.test.tsx`).
+- **Phone overflow:** since the "Tag these songs" nav item was added, `AppNavBar` overflows phone widths by about 34 px on every page (the search field and avatar run past the edge). It needs a shorter label or a scrollable nav on small screens. The favorites search check at 390 px still sees this.
+- **`happy-dom`:** installed. `UI/` still has no lockfile, so a fresh checkout needs `npm install` before the tests that use it can run.
+- **Formatting:** closed. `prettier --check` is clean on `router.tsx`, `routes.ts`, `AppNavBar.tsx`, `TagChip.tsx`, `TagChip.module.css`, `tagQueue.ts` and `CommunityPage.test.tsx`.
+- **Live queue insert and empty library:** closed. A like while the page is open is inserted after the current song, and an empty library plays recommendations.
 
 ## Library › Favorites search
 
