@@ -1,17 +1,15 @@
-import type { Tag } from '../domain/types'
+import type { ShowcaseSong } from '../domain/types'
 
-export interface ShowcaseSong {
-  seed: number
-  title: string
-  artist: string
-  tags: Tag[]
-}
-
-export const showcaseSongs: ShowcaseSong[] = [
+/**
+ * Landing hero fallback, used only when `GET /showcase` fails or the catalog has no tagged songs.
+ * Ids double as artwork seeds. Tags are shown without links, since they may not exist in the catalog.
+ */
+export const fallbackShowcase: readonly ShowcaseSong[] = [
   {
-    seed: 59,
+    id: 59,
     title: 'Sampa',
-    artist: 'Caetano Veloso',
+    artist_credit: 'Caetano Veloso',
+    image_url: null,
     tags: [
       { kind: 'feeling', name: 'warm', token: 'warm' },
       { kind: 'feeling', name: 'nostalgic', token: 'nostalgic' },
@@ -19,9 +17,10 @@ export const showcaseSongs: ShowcaseSong[] = [
     ],
   },
   {
-    seed: 19,
+    id: 19,
     title: 'So What',
-    artist: 'Miles Davis',
+    artist_credit: 'Miles Davis',
+    image_url: null,
     tags: [
       { kind: 'feeling', name: 'late night', token: 'late-night' },
       { kind: 'feeling', name: 'contemplative', token: 'contemplative' },
@@ -29,9 +28,10 @@ export const showcaseSongs: ShowcaseSong[] = [
     ],
   },
   {
-    seed: 44,
+    id: 44,
     title: 'Teardrop',
-    artist: 'Massive Attack',
+    artist_credit: 'Massive Attack',
+    image_url: null,
     tags: [
       { kind: 'genre', name: 'trip hop', token: 'trip-hop' },
       { kind: 'feeling', name: 'dreamy', token: 'dreamy' },

@@ -1,5 +1,13 @@
 import { displayTagName, foldText, normalizeTagName, sortTags, toToken } from '../../domain/tags'
-import type { CommunityFeed, Song, TagKind, TagWrite, UserSong, UserTag } from '../../domain/types'
+import type {
+  CommunityFeed,
+  Showcase,
+  Song,
+  TagKind,
+  TagWrite,
+  UserSong,
+  UserTag,
+} from '../../domain/types'
 import {
   MOCK_CATALOG_USER,
   type FixtureSong,
@@ -165,6 +173,43 @@ export function createMockCatalog(
       requireUser()
       return mockCommunity(songs, username)
     },
+    async showcase() {
+      await wait(latencyMs)
+      return mockShowcase(songs)
+    },
+  }
+}
+
+const MOCK_SHOWCASE_LIMIT = 3
+const MOCK_SHOWCASE_TAGS = 3
+
+function mockShowcase(songs: readonly FixtureSong[]): Showcase {
+  const artists = new Set<string>()
+  const picked = [...songs]
+    .map((fixture) => ({
+      fixture,
+      tags: toSong(fixture).tags.filter((tag) => tag.kind !== 'artist'),
+      order: Math.random(),
+    }))
+    .filter(({ tags }) => tags.length >= 2)
+    .sort((a, b) => a.order - b.order)
+    .filter(({ fixture }) => {
+      const key = foldText(fixture.artist_credit)
+      if (artists.has(key)) {
+        return false
+      }
+      artists.add(key)
+      return true
+    })
+    .slice(0, MOCK_SHOWCASE_LIMIT)
+  return {
+    songs: picked.map(({ fixture, tags }) => ({
+      id: fixture.id,
+      title: fixture.title,
+      artist_credit: fixture.artist_credit,
+      image_url: fixture.image_url,
+      tags: tags.slice(0, MOCK_SHOWCASE_TAGS),
+    })),
   }
 }
 

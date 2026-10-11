@@ -1,4 +1,4 @@
-"""Song, tag, playlist, favorite, community, and recommendation routes. HTTP only; catalog rules live in services."""
+"""Song, tag, playlist, favorite, community, recommendation, and showcase routes. HTTP only; catalog rules live in services."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from API.Models import (
     PlaylistSongWrite,
     PlaylistWrite,
     Recommendations,
+    Showcase,
     SongSearch,
     TagWrite,
     User,
@@ -29,6 +30,9 @@ from API.Services.favorites import FavoriteService
 from API.Services.playlists import PlaylistService
 from API.Services.recommendations import DEFAULT_LIMIT, MAX_LIMIT, RecommendationService
 from API.Services.search import SearchService
+from API.Services.showcase import DEFAULT_LIMIT as SHOWCASE_LIMIT
+from API.Services.showcase import MAX_LIMIT as SHOWCASE_MAX
+from API.Services.showcase import ShowcaseService
 from API.Services.songs import SongService
 from API.Services.tags import TagService
 
@@ -41,6 +45,7 @@ def build_router(
     community: CommunityService,
     favorites: FavoriteService,
     recommendations: RecommendationService,
+    showcase: ShowcaseService,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -50,6 +55,10 @@ def build_router(
             raise BadRequest("title is required")
         cleaned_artist = artist.strip() if artist and artist.strip() else None
         return search.search(title.strip(), cleaned_artist)
+
+    @router.get("/showcase", response_model=Showcase)
+    def landing_showcase(limit: int = Query(SHOWCASE_LIMIT, ge=1, le=SHOWCASE_MAX)) -> dict:
+        return showcase.pick(limit)
 
     @router.get("/users/{username}", response_model=User)
     def lookup_user(username: str) -> dict:

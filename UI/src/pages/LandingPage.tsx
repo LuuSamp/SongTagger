@@ -2,15 +2,16 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { APP_PATHS } from '../app/routes'
 import { PageShell } from '../components/layout/PageShell'
 import { ButtonLink } from '../components/ui/Button'
-import { showcaseSongs } from '../config/showcase'
 import { moreVibes } from '../config/vibes'
 import { HangingTags } from '../features/discovery/HangingTags'
+import { useShowcase } from '../hooks/useShowcase'
 import { VibeList } from '../features/discovery/VibeList'
 import styles from './LandingPage.module.css'
 
 export function LandingPage() {
   const { search } = useLocation()
   const params = new URLSearchParams(search)
+  const showcase = useShowcase()
 
   if (params.has('tags') || params.has('title')) {
     return <Navigate to={`${APP_PATHS.discover}${search}`} replace />
@@ -19,7 +20,7 @@ export function LandingPage() {
   return (
     <PageShell header="landing">
       <div className={styles.hero}>
-        <HangingTags songs={showcaseSongs} />
+        <HangingTags songs={showcase.songs} linkTags={showcase.linked} />
         <aside className={styles.intro}>
           <h1 className={styles.title}>
             Discover music by

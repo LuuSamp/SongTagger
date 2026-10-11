@@ -25,6 +25,7 @@ from API.Services.favorites import FavoriteService
 from API.Services.playlists import PlaylistService
 from API.Services.recommendations import RecommendationService
 from API.Services.search import SearchService
+from API.Services.showcase import ShowcaseService
 from API.Services.songs import SongService
 from API.Services.spotify_auth import SpotifyAuth
 from API.Services.spotify_export import SpotifyExport
@@ -80,6 +81,7 @@ def create_app(
             CommunityService(songs),
             FavoriteService(songs),
             RecommendationService(songs),
+            ShowcaseService(songs),
         )
     )
     app.include_router(build_spotify_router(spotify_auth))

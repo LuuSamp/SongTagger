@@ -1,5 +1,6 @@
 import type {
   CommunityFeed,
+  Showcase,
   SongSearch,
   TagWrite,
   UserSong,
@@ -17,4 +18,5 @@ export interface CatalogService {
   addTag(songId: number, tag: TagWrite): Promise<UserTag>
   removeTag(songId: number, tag: TagWrite): Promise<void>
   community(): Promise<CommunityFeed>
+  showcase(): Promise<Showcase>
 }

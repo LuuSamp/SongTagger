@@ -87,6 +87,18 @@ export interface CommunityFeed {
   rising_tags: RisingTag[]
 }
 
+export interface ShowcaseSong {
+  id: number
+  title: string
+  artist_credit: string
+  image_url: string | null
+  tags: Tag[]
+}
+
+export interface Showcase {
+  songs: ShowcaseSong[]
+}
+
 export interface RecommendedSong {
   song: UserSong
   score: number

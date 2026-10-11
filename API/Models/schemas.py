@@ -146,6 +146,18 @@ class CommunityFeed(BaseModel):
     rising_tags: list[RisingTag]
 
 
+class ShowcaseSong(BaseModel):
+    id: int
+    title: str
+    artist_credit: str
+    image_url: str | None
+    tags: list[Tag]
+
+
+class Showcase(BaseModel):
+    songs: list[ShowcaseSong]
+
+
 class FavoriteSong(BaseModel):
     song_id: int
     title: str

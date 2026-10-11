@@ -2,8 +2,8 @@ import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { discoverPath } from '../../app/routes'
 import { TagChip } from '../../components/ui/TagChip'
-import type { ShowcaseSong } from '../../config/showcase'
 import { TAG_KIND_COLORS } from '../../domain/tags'
+import type { ShowcaseSong } from '../../domain/types'
 import { SongArtwork } from '../songs/SongArtwork'
 import styles from './HangingTags.module.css'
 import { WindLayer } from './WindLayer'
@@ -16,9 +16,10 @@ const HANG = [
 
 interface HangingTagsProps {
   songs: readonly ShowcaseSong[]
+  linkTags?: boolean
 }
 
-export function HangingTags({ songs }: HangingTagsProps) {
+export function HangingTags({ songs, linkTags = true }: HangingTagsProps) {
   return (
     <figure className={styles.scene}>
       <figcaption className={styles.caption}>
@@ -37,10 +38,10 @@ export function HangingTags({ songs }: HangingTagsProps) {
         <ul className={styles.tags}>
           {songs.map((song, index) => {
             const hang = HANG[index % HANG.length] ?? { drop: 16, tilt: 0, delay: 0, anchor: 8 }
-            const searchPath = discoverPath({ title: song.title, artist: song.artist })
+            const searchPath = discoverPath({ title: song.title, artist: song.artist_credit })
             return (
               <li
-                key={song.title}
+                key={song.id}
                 className={styles.hanger}
                 style={
                   {
@@ -59,13 +60,13 @@ export function HangingTags({ songs }: HangingTagsProps) {
                     tabIndex={-1}
                     aria-hidden="true"
                   >
-                    <SongArtwork song={{ id: song.seed, title: song.title, tags: song.tags }} />
+                    <SongArtwork song={song} />
                   </Link>
                   <div className={styles.meta}>
                     <h3 className={styles.title}>
                       <Link to={searchPath}>{song.title}</Link>
                     </h3>
-                    <p className={styles.artist}>{song.artist}</p>
+                    <p className={styles.artist}>{song.artist_credit}</p>
                   </div>
                   <ul className={styles.chips} aria-label={`Tags on ${song.title}`}>
                     {song.tags.map((tag) => (
@@ -74,8 +75,8 @@ export function HangingTags({ songs }: HangingTagsProps) {
                           label={tag.name}
                           size="sm"
                           marker={TAG_KIND_COLORS[tag.kind]}
-                          to={discoverPath({ tags: [tag.token] })}
-                          title={`Find songs tagged ${tag.name}`}
+                          to={linkTags ? discoverPath({ tags: [tag.token] }) : undefined}
+                          title={linkTags ? `Find songs tagged ${tag.name}` : undefined}
                         />
                       </li>
                     ))}

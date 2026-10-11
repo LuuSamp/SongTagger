@@ -1,5 +1,6 @@
 import type {
   CommunityFeed,
+  Showcase,
   SongSearch,
   TagWrite,
   UserSong,
@@ -31,6 +32,9 @@ export function createHttpCatalog(http: HttpClient, username: string): CatalogSe
     },
     community() {
       return http.get<CommunityFeed>(`${user}/community`)
+    },
+    showcase() {
+      return http.get<Showcase>('/showcase')
     },
   }
 }
