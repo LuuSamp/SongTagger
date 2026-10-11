@@ -152,6 +152,88 @@ describe('Tag these songs', () => {
     expect(buttons(view)).not.toContain('Jazz')
   })
 
+  it('shows where the user is in the queue and advances it', async () => {
+    const view = await renderQueue()
+
+    expect(text(view)).toContain('Song 1 of 2')
+    await click(view, 'Go to next')
+    expect(text(view)).toContain('Song 2 of 2')
+  })
+
+  it('groups the suggested chips by kind with a label', async () => {
+    const view = await renderQueue()
+    const lists = [...view.querySelectorAll('ul[aria-label]')].map((list) => ({
+      label: list.getAttribute('aria-label'),
+      chips: [...list.querySelectorAll('button')].map((button) => button.textContent?.trim()),
+    }))
+
+    expect(lists).toEqual([
+      { label: 'Feeling tags', chips: ['Warm'] },
+      { label: 'Instrument tags', chips: ['Piano'] },
+    ])
+  })
+
+  it('explains what go to next will do with the current selection', async () => {
+    const view = await renderQueue()
+    const summary = () => view.querySelector('[aria-live="polite"]')?.textContent
+
+    expect(summary()).toBe('Nothing selected. Go to next skips this song.')
+    await click(view, 'Warm')
+    expect(summary()).toBe('1 tag will be saved when you go to next.')
+    await click(view, 'Piano')
+    expect(summary()).toBe('2 tags will be saved when you go to next.')
+  })
+
+  it('says when a song has no suggestions yet', async () => {
+    const bare = song(9, 'Bare Tune', [tag('genre', 'Jazz')])
+    const view = await renderQueue({
+      favorites: [favorite(9, 'Bare Tune')],
+      playlists: [],
+      songs: [bare],
+    })
+
+    expect(text(view)).toContain('No suggestions yet. Add your own below.')
+    expect(buttons(view)).toContain('Add tag')
+    expect(buttons(view)).toContain('Go to next')
+  })
+
+  it('puts a newly liked song right after the current one', async () => {
+    const liked = song(3, 'New Like', [tag('feeling', 'Sunny')])
+    const songs = [favoriteSong, playlistSong, liked]
+    const view = await renderQueue({ songs })
+    expect(text(view)).toContain('Song 1 of 2')
+
+    await rerender({ songs, favorites: [favorite(3, 'New Like'), favorite(1, 'Favorite Tune')] })
+
+    expect(text(view)).toContain('Favorite Tune')
+    expect(text(view)).toContain('Song 1 of 3')
+    await click(view, 'Go to next')
+    expect(text(view)).toContain('New Like')
+    expect(text(view)).toContain('Song 2 of 3')
+  })
+
+  it('drops a waiting song that left the library', async () => {
+    const view = await renderQueue()
+
+    await rerender({ playlists: [] })
+
+    expect(text(view)).toContain('Favorite Tune')
+    expect(text(view)).toContain('Song 1 of 1')
+    await click(view, 'Go to next')
+    expect(text(view)).not.toContain('Playlist Tune')
+  })
+
+  it('reloads the library when the window regains focus', async () => {
+    await renderQueue()
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(reloadSpy).toHaveBeenCalledTimes(1)
+    expect(reloadFavoritesSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('shows one short line when the queue is empty', async () => {
     const view = await renderQueue({ favorites: [], playlists: [], songs: [] })
     const message = view.querySelector('[role="status"]')
@@ -265,13 +347,18 @@ function queueOptions(options: QueueOptions = {}): Required<QueueOptions> {
   }
 }
 
-function renderNow(options: QueueOptions = {}): HTMLElement {
+let reloadSpy = vi.fn()
+let reloadFavoritesSpy = vi.fn()
+let catalogSongs = new Map<number, UserSong>()
+let catalog: CatalogService | null = null
+
+function tree(options: QueueOptions = {}) {
   const resolved = queueOptions(options)
-  const byId = new Map(resolved.songs.map((entry) => [entry.id, entry]))
-  const catalog = {
+  catalogSongs = new Map(resolved.songs.map((entry) => [entry.id, entry]))
+  catalog ??= {
     kind: 'http',
     getSong: (songId: number) => {
-      const found = byId.get(songId)
+      const found = catalogSongs.get(songId)
       return found ? Promise.resolve(found) : Promise.reject(new Error(`missing ${songId}`))
     },
     addTag: resolved.addTag,
@@ -284,24 +371,41 @@ function renderNow(options: QueueOptions = {}): HTMLElement {
     playlists: resolved.playlists,
     loadError: null,
     favoritesError: null,
-  } as LibraryActions
+    reload: reloadSpy,
+    reloadFavorites: reloadFavoritesSpy,
+  } as unknown as LibraryActions
+  return (
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <SessionContext.Provider value={{ username: 'ada' }}>
+        <CatalogContext.Provider value={catalog}>
+          <LibraryContext.Provider value={library}>
+            <TagPage />
+          </LibraryContext.Provider>
+        </CatalogContext.Provider>
+      </SessionContext.Provider>
+    </MemoryRouter>
+  )
+}
+
+function renderNow(options: QueueOptions = {}): HTMLElement {
+  reloadSpy = vi.fn()
+  reloadFavoritesSpy = vi.fn()
+  catalog = null
   const container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   act(() => {
-    root?.render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <SessionContext.Provider value={{ username: 'ada' }}>
-          <CatalogContext.Provider value={catalog}>
-            <LibraryContext.Provider value={library}>
-              <TagPage />
-            </LibraryContext.Provider>
-          </CatalogContext.Provider>
-        </SessionContext.Provider>
-      </MemoryRouter>,
-    )
+    root?.render(tree(options))
   })
   return container
+}
+
+async function rerender(options: QueueOptions) {
+  await act(async () => {
+    root?.render(tree(options))
+    await Promise.resolve()
+    await Promise.resolve()
+  })
 }
 
 async function renderQueue(options: QueueOptions = {}): Promise<HTMLElement> {
