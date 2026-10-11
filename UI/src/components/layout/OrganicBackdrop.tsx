@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
+import type { SceneId } from '../../domain/scenes'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
+import { Celestial } from './Celestial'
 import styles from './OrganicBackdrop.module.css'
 
 const SPLINES = '0.45 0 0.55 1;0.45 0 0.55 1'
@@ -22,20 +24,9 @@ const SHAPES = {
   },
 } as const
 
-const RAYS = Array.from({ length: 12 }, (_, index) => {
-  const angle = (index * Math.PI) / 6
-  return {
-    index,
-    degrees: index * 30,
-    x1: 60 + Math.cos(angle) * 36,
-    y1: 60 + Math.sin(angle) * 36,
-    x2: 60 + Math.cos(angle) * 48,
-    y2: 60 + Math.sin(angle) * 48,
-  }
-})
-
 interface OrganicBackdropProps {
   playing?: boolean
+  scene?: SceneId
 }
 
 function Breath({ shape }: { shape: (typeof SHAPES)[keyof typeof SHAPES] }) {
@@ -51,18 +42,23 @@ function Breath({ shape }: { shape: (typeof SHAPES)[keyof typeof SHAPES] }) {
   )
 }
 
-export function OrganicBackdrop({ playing = false }: OrganicBackdropProps) {
+export function OrganicBackdrop({ playing = false, scene = 'daylight' }: OrganicBackdropProps) {
   const reduceMotion = useReducedMotion()
   const breathe = playing && !reduceMotion
 
   return (
-    <div className={styles.backdrop} aria-hidden="true" data-playing={playing || undefined}>
+    <div
+      className={styles.backdrop}
+      aria-hidden="true"
+      data-scene={scene}
+      data-playing={playing || undefined}
+    >
       <svg className={styles.right} viewBox="0 0 400 900" preserveAspectRatio="none">
         <path
           className={styles.shape}
           style={{ '--rest': 0.55 } as CSSProperties}
           d={SHAPES.sand.rest}
-          fill="var(--color-sand)"
+          fill="var(--scene-blob-a)"
           opacity="0.55"
         >
           {breathe ? <Breath shape={SHAPES.sand} /> : null}
@@ -71,53 +67,19 @@ export function OrganicBackdrop({ playing = false }: OrganicBackdropProps) {
           className={styles.shape}
           style={{ '--rest': 0.35, '--shape-delay': '-3s' } as CSSProperties}
           d={SHAPES.ember.rest}
-          fill="var(--color-accent)"
+          fill="var(--scene-blob-b)"
           opacity="0.35"
         >
           {breathe ? <Breath shape={SHAPES.ember} /> : null}
         </path>
       </svg>
-      <svg className={styles.sun} viewBox="0 0 120 120">
-        <g className={styles.sunSpin}>
-          <circle
-            className={styles.core}
-            cx="60"
-            cy="60"
-            r="26"
-            fill="var(--color-sun)"
-            opacity="0.8"
-          />
-          {RAYS.map((ray) => (
-            <line
-              key={ray.index}
-              className={styles.ray}
-              style={
-                {
-                  '--ray': ray.index,
-                  '--rhythm': ray.index % 3,
-                  '--ox': `${ray.x1}px`,
-                  '--oy': `${ray.y1}px`,
-                  '--angle': `${ray.degrees}deg`,
-                } as CSSProperties
-              }
-              x1={ray.x1}
-              y1={ray.y1}
-              x2={ray.x2}
-              y2={ray.y2}
-              stroke="var(--color-sun)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              opacity="0.7"
-            />
-          ))}
-        </g>
-      </svg>
+      <Celestial scene={scene} className={styles.sun} />
       <svg className={styles.left} viewBox="0 0 200 400" preserveAspectRatio="none">
         <path
           className={styles.shape}
           style={{ '--rest': 0.28, '--shape-delay': '-1.5s' } as CSSProperties}
           d={SHAPES.edge.rest}
-          fill="var(--color-accent)"
+          fill="var(--scene-blob-c)"
           opacity="0.28"
         >
           {breathe ? <Breath shape={SHAPES.edge} /> : null}

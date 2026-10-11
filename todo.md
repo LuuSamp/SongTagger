@@ -404,3 +404,59 @@ Closing the player, switching provider or leaving the page always turns the ligh
 - Only 3 real listeners, so the choice leans on synthetic data. The synthetic tastes are genre-based, which favors content methods.
 - Songs without catalog genre tags (36 of 105) can only be matched through artist tags or listener tags.
 - Listens are not recorded yet.
+
+## Genre scenes (song page)
+
+The song page picks one of seven "scenes" from the song's real tags. Only the moving decoration and the accent colour change: the celestial body, the side shapes, the divider waves and the accent. The cover, tags, text, layout, nav bar and other pages stay as they were.
+
+| Scene | Genres (examples) | Body | While playing |
+|---|---|---|---|
+| Daylight (default) | pop, pop rock, soft rock, folk, country, ballad | The original sun | Equaliser rays, beat, slow turn |
+| Night | rock, alternative rock, punk, post-punk, metal, grunge | Crescent moon on a night disc with 4-point stars | The moon sways and the stars twinkle |
+| Neon | electronic, house, techno, disco, dance, synth-pop, new wave | Neon ring on a dark disc with magenta/cyan bars | The bars jump fast and the ring pulses |
+| Lounge | jazz, soul, r&b, blues, funk, trip hop, downtempo | Low amber moon with smoke rings | The smoke rings rise and fade |
+| Tropical | latin, bossa nova, mpb, samba, salsa, reggae, flamenco | Sun with 16 wavy rays | The rays sway and the sun bounces |
+| Haze | dream pop, shoegaze, ambient, chillout, classical | Pale orb with halo rings and orbiting dots | The halo breathes and the dots orbit |
+| Street | hip hop, rap, trap, grime, boom bap | Vinyl record with beat ticks | The record spins at 33 rpm and the ticks chase |
+
+**Rules** (`UI/src/domain/scenes.ts`, tested in `scenes.test.ts`):
+- `sceneForGenre` checks exact overrides first ("pop rock" → Daylight, "jazz rap" → Street, "trip hop" → Lounge…), then keyword lists.
+- `sceneForSong` counts the song's genre tags per scene, ignoring Daylight genres because they are neutral. The scene with the most tags wins; ties go to tag order. The reason is the first tag of the winning scene.
+- Without a distinctive genre, it uses feeling tags: late night/intimate → Lounge, dreamy/ethereal/contemplative → Haze, sunny/carefree → Tropical, euphoric → Neon. Otherwise the scene is Daylight.
+
+**Coverage** of the 156 genres in the seeded database:
+- Daylight 37 (pop, folk and country family), Night 32, Lounge 26, Neon 24, Tropical 13, Haze 13, Street 11.
+- Songs: Daylight 46 (45 songs have no genre tag), Night 25, Neon 15, Lounge 13, Tropical 9, Street 5, Haze 3.
+- Some results follow MusicBrainz data rather than intuition (Jolene is tagged "alternative rock"). The scene follows the tags, so community edits change it.
+
+**Live changes:** the scene is recomputed from the current tags, so adding or removing a genre or feeling tag switches the scene immediately.
+
+**Label:** `features/songs/SceneLabel.tsx` shows "Night scene · from alternative rock" above the waves. The reason links to `/discover?tags=…`.
+
+**Theming:** `UI/src/theme/scenes.css` defines `[data-scene]` tokens.
+- Scene tokens: `--scene-sky/body/detail/glow`, `--scene-blob-a/b/c`, `--scene-wave-lead/follow`.
+- Accent overrides: `--color-accent`, `-strong`, `-soft` and `--focus-ring`.
+- The song page wraps its content in `<div data-scene style="display: contents">`, so buttons, links, the tag form and focus rings inside it take the scene accent without component changes.
+- The backdrop carries its own `data-scene`.
+- Every new accent has at least 5:1 contrast on the canvas. The Daylight accent is the existing terracotta (3.3:1), which was left unchanged.
+
+**Code:**
+- `components/layout/Celestial.tsx` and `.module.css` hold the seven bodies, all in a 120×120 viewBox.
+- `OrganicBackdrop` takes a `scene` prop.
+- `PlaybackWave` takes a `scene` prop with a per-scene motion profile. The resting path is unchanged.
+
+**Motion:**
+- Nothing moves when idle.
+- Turning bodies use `animation-play-state`, so they hold their angle when playback stops.
+- Reduced motion shows a steady lit state.
+- Below 960 px the body stays hidden, as before; the shapes, waves and label still carry the scene.
+
+**Verified in Chrome (1440 px and 390 px) against the real API:**
+- All 7 scenes checked on real songs. In every one, nothing animates when idle and everything animates when playing.
+- Real YouTube playback was checked for Neon (Teardrop) and Lounge (Glory Box). Bohemian Rhapsody's YouTube embed did not start in headless Chrome. The other scenes were checked by setting the playing attribute from the test.
+- Reduced motion: nothing animates.
+- The nav bar keeps the default accent.
+- Adding the genre "jazz" to Purple Rain switched it to Lounge, and removing it switched back.
+- No overflow and no console errors.
+
+**Not done:** dark mode does not exist in the app yet, so scenes were designed for the light canvas only.

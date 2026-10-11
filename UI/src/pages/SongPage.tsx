@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { APP_PATHS, parseSongId } from '../app/routes'
 import { OrganicBackdrop } from '../components/layout/OrganicBackdrop'
@@ -6,6 +6,7 @@ import { PageShell } from '../components/layout/PageShell'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Skeleton } from '../components/ui/Skeleton'
 import { StateMessage } from '../components/ui/StateMessage'
+import { sceneForSong, type SceneChoice } from '../domain/scenes'
 import { catalogSources, formatDuration, listeningSources } from '../domain/songs'
 import type { UserSong } from '../domain/types'
 import { AddToPlaylist } from '../features/library/AddToPlaylist'
@@ -13,6 +14,7 @@ import { FavoriteButton } from '../features/library/FavoriteButton'
 import { SimilarSongs } from '../features/songs/SimilarSongs'
 import { CoverPlayer } from '../features/songs/CoverPlayer'
 import { PlaybackWave } from '../features/songs/PlaybackWave'
+import { SceneLabel } from '../features/songs/SceneLabel'
 import { SourceLinks } from '../features/songs/SourceLinks'
 import { SongTagsPanel } from '../features/tags/SongTagsPanel'
 import { useSong } from '../hooks/useSong'
@@ -25,6 +27,11 @@ export function SongPage() {
   const songId = parseSongId(rawId)
   const { state, setData, reload } = useSong(songId)
   const [playing, setPlaying] = useState(false)
+  const loaded = state.data && state.data.id === songId ? state.data : null
+  const choice = useMemo<SceneChoice>(
+    () => (loaded ? sceneForSong(loaded.tags) : { scene: 'daylight', reason: null }),
+    [loaded],
+  )
 
   if (
     songId === null ||
@@ -63,22 +70,25 @@ export function SongPage() {
   }
 
   return (
-    <PageShell backdrop={<OrganicBackdrop playing={playing} />}>
-      <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-        <Link to={APP_PATHS.discover}>← Discovery</Link>
-      </nav>
-      {state.data && state.data.id === songId ? (
-        <SongDetail
-          key={state.data.id}
-          song={state.data}
-          update={setData}
-          reload={reload}
-          playing={playing}
-          onPlayingChange={setPlaying}
-        />
-      ) : (
-        <SongDetailSkeleton />
-      )}
+    <PageShell backdrop={<OrganicBackdrop playing={playing} scene={choice.scene} />}>
+      <div className={styles.scene} data-scene={choice.scene}>
+        <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
+          <Link to={APP_PATHS.discover}>← Discovery</Link>
+        </nav>
+        {loaded ? (
+          <SongDetail
+            key={loaded.id}
+            song={loaded}
+            update={setData}
+            reload={reload}
+            playing={playing}
+            onPlayingChange={setPlaying}
+            choice={choice}
+          />
+        ) : (
+          <SongDetailSkeleton />
+        )}
+      </div>
     </PageShell>
   )
 }
@@ -89,9 +99,10 @@ interface SongDetailProps {
   reload: () => void
   playing: boolean
   onPlayingChange: (playing: boolean) => void
+  choice: SceneChoice
 }
 
-function SongDetail({ song, update, reload, playing, onPlayingChange }: SongDetailProps) {
+function SongDetail({ song, update, reload, playing, onPlayingChange, choice }: SongDetailProps) {
   const tagging = useTagMutations({ songId: song.id, update, reload })
   const duration = formatDuration(song.duration_ms)
   const listenOn = listeningSources(song.sources)
@@ -129,7 +140,10 @@ function SongDetail({ song, update, reload, playing, onPlayingChange }: SongDeta
         <SourceLinks label="Listen on:" sources={listenOn} />
 
         <div className={styles.more}>
-          <PlaybackWave className={styles.wave} playing={playing} />
+          <div className={styles.mood}>
+            <SceneLabel choice={choice} />
+            <PlaybackWave className={styles.wave} playing={playing} scene={choice.scene} />
+          </div>
 
           <section className={styles.about} aria-labelledby="about-title">
             <h2 id="about-title" className={styles.sectionTitle}>
